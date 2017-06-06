@@ -10,6 +10,9 @@ import lmdb
 import numpy as np
 import cv2 as cv
 
+(major, minor, _) = cv.__version__.split(".")
+
+
 class ProcessRGBImage:
     def __init__(self):
 
@@ -78,16 +81,10 @@ class ProcessRGBImage:
 
                     datum[6:7][0] = msk
 
-                    print datum.shape
-                    print rgb.shape
-                    print dep.shape
-                    print msk.shape
-                    print
-                    
-                    cv.imshow("dep", data_array[j+1])
-                    cv.imshow("mask", data_array[j+2])
-                    cv.imshow("rgb", data_array[j])
-                    cv.waitKey(0)
+                    #cv.imshow("dep", data_array[j+1])
+                    #cv.imshow("mask", data_array[j+2])
+                    #cv.imshow("rgb", data_array[j])
+                    #cv.waitKey(0)
 
         #lmdb_images.close()
 
@@ -117,7 +114,7 @@ class ProcessRGBImage:
             nw = nw-((nx+nw)-im_rgb.shape[1]) if (nx+nw) > im_rgb.shape[1] else nw
             nh = nh-((ny+nh)-im_rgb.shape[0]) if (ny+nh) > im_rgb.shape[0] else nh
 
-            rects.append((nx, ny, nw, nh))
+            rects.append([nx, ny, nw, nh])
             
             rgb = im_rgb[ny:ny+nh, nx:nx+nw].copy()
             dep = im_dep[ny:ny+nh, nx:nx+nw].copy()
@@ -132,13 +129,42 @@ class ProcessRGBImage:
             data_array.append(dep)
             data_array.append(msk)
 
-        for bbox in rects:
+        for im, bb in zip(data_array, rects):
             #for i in xrange(0, num_samples, 1):
-            r = random.randint(0, min(w/2, h/2))
+            r = random.randint(-min(w/2, h/2), min(w/2, h/2))
+            print bb
+            box = bb
+            box[0] = bb[0] + r
+            box[1] = bb[1] + r
+
+            x, y, w, h = box            
+            x2 = x + w
+            y2 = y + h
+            x = rect[0] if x > rect[0] else x
+            y = rect[1] if y > rect[1] else y
+            x = x + ((rect[0] + rect[2]) - x2) if x2 < rect[0] + rect[2] else x
+            y = y + ((rect[1] + rect[3]) - y2) if y2 < rect[1] + rect[3] else y
             
+            #! boarder conditions
+            x = 0 if x < 0 else x
+            y = 0 if y < 0 else y
+            w = w-(x2-im_rgb.shape[1]) if x2 > im_rgb.shape[1] else w
+            h = h-(y2-im_rgb.shape[0]) if y2 > im_rgb.shape[0] else h
+
             
+
+            print box, " ", rect
+            print (x2 - (rect[0] + rect[2]))
+
+            cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
+
+            x,y,w,h = rect
+            cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
+
+            cv.namedWindow('img', cv.WINDOW_NORMAL)
+            cv.imshow('img', im_rgb)
+            cv.waitKey(0)
             
-            print r
         return data_array
 
         
@@ -155,7 +181,11 @@ class ProcessRGBImage:
         im_gray[im_gray <= thresh_min] = 0
 
         ##! fill the gap
-        contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+        if major < 3:
+            contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+        else:
+            im, contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, \
+                                                cv.CHAIN_APPROX_SIMPLE)
 
         max_area = 0
         index = -1
