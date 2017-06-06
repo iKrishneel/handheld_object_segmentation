@@ -52,40 +52,12 @@ class ProcessRGBImage:
                 im_dep = cv.imread(str(line2))
                 im_mask = cv.imread(str(line3), 0)
 
-                data_array = self.create_training_data(im_rgb, im_dep, im_mask)
-
-                W = self.__in_size[0]
-                H = self.__in_size[1]
-                K = im_dep.shape[2] + im_rgb.shape[2] + 1
+                train_datum = self.create_training_data(im_rgb, im_dep, im_mask)
+                if not train_datum is None:
+                    print train_datum[0].shape
+                    print train_datum[1].shape
                 
-                for j in xrange(0, len(data_array), 3):
-                    ##! write to lmdb
-                    rgb = data_array[j].copy()
-                    dep = data_array[j+1].copy()
-                    msk = data_array[j+2].copy()
-
-                    ##! change to network input size
-                    rgb = cv.resize(rgb, (self.__in_size))
-                    dep = cv.resize(dep, (self.__in_size))
-                    msk = cv.resize(msk, (self.__in_size))
-
-                    datum = np.zeros((K, W, H), np.float)
-
-                    rgb = rgb.swapaxes(2, 0)
-                    rgb = rgb.swapaxes(2, 1)
-                    datum[0:3] = rgb
                 
-                    dep = dep.swapaxes(2, 0)
-                    dep = dep.swapaxes(2, 1)
-                    datum[3:6] = dep
-
-                    datum[6:7][0] = msk
-
-                    #cv.imshow("dep", data_array[j+1])
-                    #cv.imshow("mask", data_array[j+2])
-                    #cv.imshow("rgb", data_array[j])
-                    #cv.waitKey(0)
-
         #lmdb_images.close()
 
 
@@ -102,7 +74,7 @@ class ProcessRGBImage:
         scales = np.array([1.5, 1.75, 2.0])
 
         rects = []
-        data_array = []
+        #data_array = []
         for s in scales:
             nw = int(s * w)
             nh = int(s * h)
@@ -116,41 +88,14 @@ class ProcessRGBImage:
 
             rects.append([nx, ny, nw, nh])
             
-            # rgb = im_rgb[ny:ny+nh, nx:nx+nw].copy()
-            # dep = im_dep[ny:ny+nh, nx:nx+nw].copy()
-            # msk = mask[ny:ny+nh, nx:nx+nw].copy()
-
-            # ##! normalize data
-            # rgb = self.demean_rgb_image(rgb)
-            # dep = dep.astype(np.float)
-            # dep /= dep.max()
-
-            # data_array.append(rgb)
-            # data_array.append(dep)
-            # data_array.append(msk)
-
         train_pairs = []
         for index, bb in enumerate(rects):
             
             rgb, dep, msk = self.normalize_and_crop_inputs(im_rgb, im_dep, mask, bb)
-            # nx, ny, nw, nh = bb
-            # rgb = im_rgb[ny:ny+nh, nx:nx+nw].copy()
-            # dep = im_dep[ny:ny+nh, nx:nx+nw].copy()
-            # msk = mask[ny:ny+nh, nx:nx+nw].copy()
-
-            # #! interpolate to network insize
-            # rgb = cv.resize(rgb, (self.__in_size))
-            # dep = cv.resize(dep, (self.__in_size))
-            # msk = cv.resize(msk, (self.__in_size))            
-
-            # ##! normalize data
-            # rgb = self.demean_rgb_image(rgb)
-            # dep = dep.astype(np.float)
-            # dep /= dep.max()
 
             #for i in xrange(0, num_samples, 1):
             r = random.randint(-min(w/2, h/2), min(w/2, h/2))
-            print bb
+
             box = bb
             box[0] = bb[0] + r
             box[1] = bb[1] + r
@@ -174,35 +119,23 @@ class ProcessRGBImage:
             
             rgb1, dep1, msk1 = self.normalize_and_crop_inputs(im_rgb, im_dep, mask, box)
 
-            # #! crop and normalize
-            # rgb1 = im_rgb[y:y+h, x:x+w].copy()
-            # dep1 = im_dep[y:y+h, x:x+w].copy()
-            # msk1 = mask[y:y+h, x:x+w].copy()
+            grndtruth_datum = self.pack_array(rgb, dep, msk)
+            tgt_datum = self.pack_array(rgb1, dep1, msk1)
+         
+            train_pairs.append(grndtruth_datum)
+            train_pairs.append(tgt_datum)
 
-            # #! resize of network input
-            # rgb1 = cv.resize(rgb1, (self.__in_size))
-            # dep1 = cv.resize(dep1, (self.__in_size))
-            # msk1 = cv.resize(msk1, (self.__in_size))            
-            
-            # rgb1 = self.demean_rgb_image(rgb1)
-            # dep1 = dep1.astype(np.float)
-            # dep1 /= dep1.max()
-            
-            
-            print index
+
 
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
-
             x,y,w,h = rect
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
 
             cv.namedWindow('img', cv.WINDOW_NORMAL)
-            cv.imshow('img', msk1)
-            cv.waitKey(0)
+            cv.imshow('img', im_rgb)
+            cv.waitKey(3)
             
-        return data_array
-
-
+        return train_pairs
 
     def normalize_and_crop_inputs(self, im_rgb, im_dep, im_mask, rect):
         x, y, w, h = rect
@@ -221,6 +154,22 @@ class ProcessRGBImage:
 
         return rgb, dep, msk
         
+    def pack_array(self, rgb, dep, mask):
+        W = self.__in_size[1]
+        H = self.__in_size[0]
+        K = rgb.shape[2] + dep.shape[2] + 1
+        datum = np.zeros((K, W, H), np.float)
+        rgb = rgb.swapaxes(2, 0)
+        rgb = rgb.swapaxes(2, 1)
+        datum[0:3] = rgb
+        
+        dep = dep.swapaxes(2, 0)
+        dep = dep.swapaxes(2, 1)
+        datum[3:6] = dep
+
+        datum[6:7][0] = mask
+        
+        return datum
         
     def create_mask_labels(self, im_mask):
         if len(im_mask.shape) is None:
