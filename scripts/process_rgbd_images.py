@@ -16,7 +16,7 @@ import cv2 as cv
 class ProcessRGBImage:
     def __init__(self):
 
-        self.__in_size = (224, 224)
+        self.__in_size = (320, 320)
         
         self.__directory = '/home/krishneel/Documents/datasets/handheld_objects/'
         self.__textfile = self.__directory + 'train.txt'
@@ -116,20 +116,38 @@ class ProcessRGBImage:
 
             rects.append([nx, ny, nw, nh])
             
-            rgb = im_rgb[ny:ny+nh, nx:nx+nw].copy()
-            dep = im_dep[ny:ny+nh, nx:nx+nw].copy()
-            msk = mask[ny:ny+nh, nx:nx+nw].copy()
+            # rgb = im_rgb[ny:ny+nh, nx:nx+nw].copy()
+            # dep = im_dep[ny:ny+nh, nx:nx+nw].copy()
+            # msk = mask[ny:ny+nh, nx:nx+nw].copy()
 
-            ##! normalize data
-            rgb = self.demean_rgb_image(rgb)
-            dep = dep.astype(np.float)
-            dep /= dep.max()
+            # ##! normalize data
+            # rgb = self.demean_rgb_image(rgb)
+            # dep = dep.astype(np.float)
+            # dep /= dep.max()
 
-            data_array.append(rgb)
-            data_array.append(dep)
-            data_array.append(msk)
+            # data_array.append(rgb)
+            # data_array.append(dep)
+            # data_array.append(msk)
 
-        for im, bb in zip(data_array, rects):
+        train_pairs = []
+        for index, bb in enumerate(rects):
+            
+            rgb, dep, msk = self.normalize_and_crop_inputs(im_rgb, im_dep, mask, bb)
+            # nx, ny, nw, nh = bb
+            # rgb = im_rgb[ny:ny+nh, nx:nx+nw].copy()
+            # dep = im_dep[ny:ny+nh, nx:nx+nw].copy()
+            # msk = mask[ny:ny+nh, nx:nx+nw].copy()
+
+            # #! interpolate to network insize
+            # rgb = cv.resize(rgb, (self.__in_size))
+            # dep = cv.resize(dep, (self.__in_size))
+            # msk = cv.resize(msk, (self.__in_size))            
+
+            # ##! normalize data
+            # rgb = self.demean_rgb_image(rgb)
+            # dep = dep.astype(np.float)
+            # dep /= dep.max()
+
             #for i in xrange(0, num_samples, 1):
             r = random.randint(-min(w/2, h/2), min(w/2, h/2))
             print bb
@@ -151,10 +169,27 @@ class ProcessRGBImage:
             w = w-(x2-im_rgb.shape[1]) if x2 > im_rgb.shape[1] else w
             h = h-(y2-im_rgb.shape[0]) if y2 > im_rgb.shape[0] else h
 
+            box[0] = x
+            box[1] = y
             
+            rgb1, dep1, msk1 = self.normalize_and_crop_inputs(im_rgb, im_dep, mask, box)
 
-            print box, " ", rect
-            print (x2 - (rect[0] + rect[2]))
+            # #! crop and normalize
+            # rgb1 = im_rgb[y:y+h, x:x+w].copy()
+            # dep1 = im_dep[y:y+h, x:x+w].copy()
+            # msk1 = mask[y:y+h, x:x+w].copy()
+
+            # #! resize of network input
+            # rgb1 = cv.resize(rgb1, (self.__in_size))
+            # dep1 = cv.resize(dep1, (self.__in_size))
+            # msk1 = cv.resize(msk1, (self.__in_size))            
+            
+            # rgb1 = self.demean_rgb_image(rgb1)
+            # dep1 = dep1.astype(np.float)
+            # dep1 /= dep1.max()
+            
+            
+            print index
 
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
 
@@ -162,11 +197,29 @@ class ProcessRGBImage:
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
 
             cv.namedWindow('img', cv.WINDOW_NORMAL)
-            cv.imshow('img', im_rgb)
+            cv.imshow('img', msk1)
             cv.waitKey(0)
             
         return data_array
 
+
+
+    def normalize_and_crop_inputs(self, im_rgb, im_dep, im_mask, rect):
+        x, y, w, h = rect
+        rgb = im_rgb[y:y+h, x:x+w].copy()
+        dep = im_dep[y:y+h, x:x+w].copy()
+        msk = im_mask[y:y+h, x:x+w].copy()
+        
+        #! resize of network input
+        rgb = cv.resize(rgb, (self.__in_size))
+        dep = cv.resize(dep, (self.__in_size))
+        msk = cv.resize(msk, (self.__in_size))            
+        
+        rgb = self.demean_rgb_image(rgb)
+        dep = dep.astype(np.float)
+        dep /= dep.max()
+
+        return rgb, dep, msk
         
         
     def create_mask_labels(self, im_mask):
