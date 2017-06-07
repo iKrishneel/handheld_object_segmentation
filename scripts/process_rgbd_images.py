@@ -10,8 +10,7 @@ import lmdb
 import numpy as np
 import cv2 as cv
 
-(major, minor, _) = cv.__version__.split(".")
-
+(CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
 
 class ProcessRGBImage:
     def __init__(self):
@@ -26,41 +25,75 @@ class ProcessRGBImage:
             sys.exit()
 
         lmdb_folder = self.__directory + 'lmdb/'
+        if os.path.exists(lmdb_folder):
+            shutil.rmtree(lmdb_folder)        
         if not os.path.exists(lmdb_folder):
             os.makedirs(lmdb_folder)
             
         self.__lmdb_images = lmdb_folder + 'features'
-        if os.path.exists(self.__lmdb_images):
-            shutil.rmtree(self.__lmdb_images)
+        self.__lmdb_labels = lmdb_folder + 'labels'
             
         self.process()
 
     def process(self):
         lines = self.read_textfile(self.__textfile)
-        #np.random.shuffle(lines)
 
-        # setup
+        #! get only rgb image and sort it
+        img_lists = []
+        for index in xrange(0, len(lines), 3):
+            img_lists.append(lines[index].split()[0])
+
+        np.random.shuffle(img_lists)
+
+        lines = []
+        for line in img_lists:
+            p = line.split(os.sep)
+            dep_path = self.__directory + p[-3] + '/depth/' + p[-1]
+            msk_path = self.__directory + p[-3] + '/mask/' + p[-1]
+            lines.append(line)
+            lines.append(dep_path)
+            lines.append(msk_path)
+            
         map_size = 1e12
-        #lmdb_images = lmdb.open(str(self.__lmdb_images), map_size=int(map_size))
-        #with lmdb_images.begin(write=True) as img_db:
-        for z in xrange(0, 1, 1):
-            for index in xrange(0, len(lines), 3):
-                line1 = lines[index].split()[0]
-                line2 = lines[index+1].split()[0]
-                line3 = lines[index+2].split()[0]
-                im_rgb = cv.imread(str(line1))
-                im_dep = cv.imread(str(line2))
-                im_mask = cv.imread(str(line3), 0)
+        lmdb_labels = lmdb.open(str(self.__lmdb_labels), map_size=int(map_size))
+        lmdb_images = lmdb.open(str(self.__lmdb_images), map_size=int(map_size))
+        counter = 0
+        with lmdb_labels.begin(write=True) as lab_db, lmdb_images.begin(write=True) as img_db:
+            flip_flag = False
+            for z in xrange(0, 1, 1):
+                for index in xrange(0, len(lines), 3):
 
-                train_datum = self.create_training_data(im_rgb, im_dep, im_mask)
-                if not train_datum is None:
-                    print train_datum[0].shape
-                    print train_datum[1].shape
-                
-                
-        #lmdb_images.close()
+                    print lines[index]
+                    
+                    line1 = lines[index].split()[0]
+                    line2 = lines[index+1].split()[0]
+                    line3 = lines[index+2].split()[0]
+                    im_rgb = cv.imread(str(line1))
+                    im_dep = cv.imread(str(line2))
+                    im_mask = cv.imread(str(line3), 0)
 
+                    if flip_flag:
+                        im_rgb = cv.flip(im_rgb, -1)
+                        im_dep = cv.flip(im_dep, -1)
+                        im_mask = cv.flip(im_mask, -1)
+                    
+                    train_datum = self.create_training_data(im_rgb, im_dep, im_mask)
+                    if not train_datum is None:
+                        for j in xrange(0, len(train_datum), 2):
+                            templ_datum = caffe.io.array_to_datum(train_datum[j]) ##! template with labels
+                            target_datum = caffe.io.array_to_datum(train_datum[j+1]) ##! target with labels
 
+                            lab_db.put('{:0>10d}'.format(counter), templ_datum.SerializeToString())
+                            img_db.put('{:0>10d}'.format(counter), target_datum.SerializeToString())
+                            counter += 1
+                flip_flag = True
+        print "counter: ", counter
+        lmdb_images.close()
+        lmdb_labels.close()
+
+    """
+    Function to pack the template data and the search target region.
+    """
     def create_training_data(self, im_rgb, im_dep, im_mask, num_samples = 3):
 
         mask, rect = self.create_mask_labels(im_mask)
@@ -119,21 +152,19 @@ class ProcessRGBImage:
             
             rgb1, dep1, msk1 = self.normalize_and_crop_inputs(im_rgb, im_dep, mask, box)
 
-            grndtruth_datum = self.pack_array(rgb, dep, msk)
+            templ_datum = self.pack_array(rgb, dep)
             tgt_datum = self.pack_array(rgb1, dep1, msk1)
          
-            train_pairs.append(grndtruth_datum)
+            train_pairs.append(templ_datum)
             train_pairs.append(tgt_datum)
-
-
 
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
             x,y,w,h = rect
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
 
-            cv.namedWindow('img', cv.WINDOW_NORMAL)
-            cv.imshow('img', im_rgb)
-            cv.waitKey(3)
+            #! cv.namedWindow('img', cv.WINDOW_NORMAL)
+            #!cv.imshow('img', im_rgb)
+            #!cv.waitKey(3)
             
         return train_pairs
 
@@ -147,6 +178,7 @@ class ProcessRGBImage:
         rgb = cv.resize(rgb, (self.__in_size))
         dep = cv.resize(dep, (self.__in_size))
         msk = cv.resize(msk, (self.__in_size))            
+
         
         rgb = self.demean_rgb_image(rgb)
         dep = dep.astype(np.float)
@@ -154,10 +186,12 @@ class ProcessRGBImage:
 
         return rgb, dep, msk
         
-    def pack_array(self, rgb, dep, mask):
+    def pack_array(self, rgb, dep, mask = None):
         W = self.__in_size[1]
         H = self.__in_size[0]
-        K = rgb.shape[2] + dep.shape[2] + 1
+        K = rgb.shape[2] + dep.shape[2]
+        if not mask is None:
+            K += 1
         datum = np.zeros((K, W, H), np.float)
         rgb = rgb.swapaxes(2, 0)
         rgb = rgb.swapaxes(2, 1)
@@ -167,7 +201,8 @@ class ProcessRGBImage:
         dep = dep.swapaxes(2, 1)
         datum[3:6] = dep
 
-        datum[6:7][0] = mask
+        if not mask is None:
+            datum[6:7][0] = mask
         
         return datum
         
@@ -183,7 +218,7 @@ class ProcessRGBImage:
         im_gray[im_gray <= thresh_min] = 0
 
         ##! fill the gap
-        if major < 3:
+        if CV_MAJOR < str(3):
             contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
         else:
             im, contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, \
@@ -199,8 +234,10 @@ class ProcessRGBImage:
                 max_area = a
                 index = i
 
-        mask = np.asarray(im_gray, np.float_)
-        mask = mask / mask.max()
+        mask = None
+        if index > -1:
+            mask = np.asarray(im_gray, np.float_)
+            mask = mask / mask.max()
 
         rect = cv.boundingRect(contour[index]) if index > -1 else None
         
