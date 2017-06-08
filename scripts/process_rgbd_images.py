@@ -15,7 +15,7 @@ import cv2 as cv
 class ProcessRGBImage:
     def __init__(self):
 
-        self.__in_size = (320, 320)
+        self.__in_size = (224, 224)
         
         self.__directory = '/home/krishneel/Documents/datasets/handheld_objects/'
         self.__textfile = self.__directory + 'train.txt'
@@ -63,8 +63,8 @@ class ProcessRGBImage:
             for z in xrange(0, 1, 1):
                 for index in xrange(0, len(lines), 3):
 
-                    print lines[index]
-                    
+                    print 'processing: ', lines[index]
+
                     line1 = lines[index].split()[0]
                     line2 = lines[index+1].split()[0]
                     line3 = lines[index+2].split()[0]
@@ -151,7 +151,7 @@ class ProcessRGBImage:
             box[1] = y
             
             rgb1, dep1, msk1 = self.normalize_and_crop_inputs(im_rgb, im_dep, mask, box)
-
+            
             templ_datum = self.pack_array(rgb, dep)
             tgt_datum = self.pack_array(rgb1, dep1, msk1)
          
@@ -178,11 +178,12 @@ class ProcessRGBImage:
         rgb = cv.resize(rgb, (self.__in_size))
         dep = cv.resize(dep, (self.__in_size))
         msk = cv.resize(msk, (self.__in_size))            
-
         
         rgb = self.demean_rgb_image(rgb)
         dep = dep.astype(np.float)
         dep /= dep.max()
+
+        msk[msk>0.0] = 1.0
 
         return rgb, dep, msk
         
