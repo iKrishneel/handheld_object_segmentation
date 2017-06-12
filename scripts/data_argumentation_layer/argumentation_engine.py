@@ -85,6 +85,8 @@ class ArgumentationEngine(object):
         # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
         # x,y,w,h = rect
         # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
+        # mask1 = mask_datum[0].copy()
+        # mask1 = mask1.swapaxes(0, 1)
         # cv.namedWindow('img', cv.WINDOW_NORMAL)
         # cv.imshow('img', mask1)
         # cv.waitKey(0)

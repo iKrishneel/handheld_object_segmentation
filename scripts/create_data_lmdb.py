@@ -60,7 +60,7 @@ class ProcessRGBImage:
         counter = 0
         with lmdb_labels.begin(write=True) as lab_db, \
         lmdb_images.begin(write=True) as img_db:
-            for index in xrange(3, len(lines), 3):
+            for index in xrange(0, len(lines), 3):
                 print 'processing: ', lines[index]
 
                 ### ---- target -> current image
@@ -75,44 +75,20 @@ class ProcessRGBImage:
                 im_dep = im_dep.astype(np.float)
                 im_dep /= im_dep.max()
 
-                im_mask = im_mask.astype(np.float)
-                im_mask /= im_mask.max()
-                im_mask[im_mask > 0.20] = 1.0
+                im_mask, rect = self.create_mask_labels(im_mask)
+                if not rect is None:
+                    im_mask[im_mask > 0.0] = 1.0
 
-                datum = np.zeros((im_rgb.shape[0], im_rgb.shape[1], 7), np.float)
-                datum[:, :, 0:3] = im_rgb
-                datum[:, :, 3:6] = im_dep
-                datum[:, :, 6:7] = im_mask[:,:, np.newaxis]
-
-                #### ---- template-> previous image
-                line1 = lines[index-3].split()[0]
-                line2 = lines[index-2].split()[0]
-                line3 = lines[index-1].split()[0]
-                im_rgb = cv.imread(str(line1))
-                im_dep = cv.imread(str(line2))
-                #im_mask = cv.imread(str(line3), 0)
+                    datum = np.zeros((im_rgb.shape[0], im_rgb.shape[1], 7), np.float)
+                    datum[:, :, 0:3] = im_rgb
+                    datum[:, :, 3:6] = im_dep
+                    datum[:, :, 6:7] = im_mask[:,:, np.newaxis]
                 
-                im_rgb = self.demean_rgb_image(im_rgb)
-                im_dep = im_dep.astype(np.float)
-                im_dep /= im_dep.max()
+                    target_datum = caffe.io.array_to_datum(datum) ##! target                
 
-                im_mask = im_mask.astype(np.float)
-                im_mask /= im_mask.max()
-                im_mask[im_mask > 0.20] = 1.0
+                    img_db.put('{:0>10d}'.format(counter), target_datum.SerializeToString())
+                    counter += 1
 
-                datum2 = np.zeros((im_rgb.shape[0], im_rgb.shape[1], 7), np.float)
-                datum2[:, :, 0:3] = im_rgb
-                datum2[:, :, 3:6] = im_dep
-                datum2[:, :, 6:7] = im_mask[:,:, np.newaxis]
-                
-
-                target_datum = caffe.io.array_to_datum(datum) ##! target                
-                templ_datum = caffe.io.array_to_datum(datum2) ##! template
-
-                lab_db.put('{:0>10d}'.format(counter), templ_datum.SerializeToString())
-                img_db.put('{:0>10d}'.format(counter), target_datum.SerializeToString())
-                counter += 1
-                        
         print "counter: ", counter
         lmdb_images.close()
         lmdb_labels.close()
