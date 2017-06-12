@@ -30,8 +30,8 @@ class ProcessRGBImage:
         if not os.path.exists(lmdb_folder):
             os.makedirs(lmdb_folder)
             
-        self.__lmdb_images = lmdb_folder + 'features'
-        self.__lmdb_labels = lmdb_folder + 'labels'
+        self.__lmdb_images = lmdb_folder + 'targets'
+        self.__lmdb_labels = lmdb_folder + 'templates'
             
         self.process()
 
@@ -58,7 +58,8 @@ class ProcessRGBImage:
         lmdb_labels = lmdb.open(str(self.__lmdb_labels), map_size=int(map_size))
         lmdb_images = lmdb.open(str(self.__lmdb_images), map_size=int(map_size))
         counter = 0
-        with lmdb_labels.begin(write=True) as lab_db, lmdb_images.begin(write=True) as img_db:
+        with lmdb_labels.begin(write=True) as lab_db, \
+        lmdb_images.begin(write=True) as img_db:
             for index in xrange(3, len(lines), 3):
                 print 'processing: ', lines[index]
 
@@ -89,7 +90,7 @@ class ProcessRGBImage:
                 line3 = lines[index-1].split()[0]
                 im_rgb = cv.imread(str(line1))
                 im_dep = cv.imread(str(line2))
-                im_mask = cv.imread(str(line3), 0)
+                #im_mask = cv.imread(str(line3), 0)
                 
                 im_rgb = self.demean_rgb_image(im_rgb)
                 im_dep = im_dep.astype(np.float)
@@ -104,20 +105,18 @@ class ProcessRGBImage:
                 datum2[:, :, 3:6] = im_dep
                 datum2[:, :, 6:7] = im_mask[:,:, np.newaxis]
                 
-                
-                # train_datum = self.create_training_data(im_rgb, im_dep, im_mask)
-                # if not train_datum is None:
-                #     for j in xrange(0, len(train_datum), 2):
-                #         templ_datum = caffe.io.array_to_datum(train_datum[j]) ##! template with labels
-                #         target_datum = caffe.io.array_to_datum(train_datum[j+1]) ##! target with labels
 
-                #         lab_db.put('{:0>10d}'.format(counter), templ_datum.SerializeToString())
-                #         img_db.put('{:0>10d}'.format(counter), target_datum.SerializeToString())
-                #         counter += 1
+                target_datum = caffe.io.array_to_datum(datum) ##! target                
+                templ_datum = caffe.io.array_to_datum(datum2) ##! template
+
+                lab_db.put('{:0>10d}'.format(counter), templ_datum.SerializeToString())
+                img_db.put('{:0>10d}'.format(counter), target_datum.SerializeToString())
+                counter += 1
                         
         print "counter: ", counter
         lmdb_images.close()
         lmdb_labels.close()
+
 
     """
     Function to pack the template data and the search target region.
