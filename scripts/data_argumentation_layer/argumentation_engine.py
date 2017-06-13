@@ -5,6 +5,8 @@ import random
 import numpy as np
 import cv2 as cv
 
+(CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
+
 class ArgumentationEngine(object):
     def __init__(self, im_width, im_height):
         self.__in_size = (im_width, im_height)
@@ -23,13 +25,28 @@ class ArgumentationEngine(object):
         
         return self.generate_argumented_data(im_rgb, im_dep, im_mask)
 
+    def process2(self, in_rgb, in_dep, in_mask):
+        flip_flag = random.randint(-1, 1)
+        im_rgb = cv.flip(in_rgb, flip_flag)
+        im_dep = cv.flip(in_dep, flip_flag)
+        im_mask = cv.flip(in_mask, flip_flag)
+
+        im_rgb = self.demean_rgb_image(im_rgb)
+        im_dep = im_dep.astype(np.float)
+        im_dep /= im_dep.max()
+        
+        return self.generate_argumented_data(im_rgb, im_dep, im_mask)
+
     """
     Function to pack the template data and the search target region.
     """
-    def generate_argumented_data(self, im_rgb, im_dep, im_mask):
+    def generate_argumented_data(self, im_rgb, im_dep, in_mask):
 
-        rect = self.bounding_rect(im_mask)
-
+        # rect = self.bounding_rect(im_mask)
+        im_mask, rect = self.create_mask_labels(in_mask)
+        im_mask = im_mask.astype(np.float)
+        im_mask /= im_mask.max()
+        
         ##! crop region around the object
         x, y, w, h = rect
         cx, cy = (x + w/2.0, y + h/2.0)
@@ -81,14 +98,15 @@ class ArgumentationEngine(object):
         #! pack mask label in 4D
         target_datum = tgt_datum[0:6].copy()
         mask_datum = tgt_datum[6:7].copy()
-
+        mask_datum[mask_datum > 0.0] = 1.0
+        
         # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
         # x,y,w,h = rect
         # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
         # mask1 = mask_datum[0].copy()
         # mask1 = mask1.swapaxes(0, 1)
         # cv.namedWindow('img', cv.WINDOW_NORMAL)
-        # cv.imshow('img', mask1)
+        # cv.imshow('img', im_rgb)
         # cv.waitKey(0)
 
         return (templ_datum, target_datum, mask_datum)        
@@ -149,3 +167,39 @@ class ArgumentationEngine(object):
         im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
         return im_rgb
         
+    def create_mask_labels(self, im_mask):
+        if len(im_mask.shape) is None:
+            print 'ERROR: Empty input mask'
+            return
+
+        thresh_min = 100
+        thresh_max = 255
+        im_gray = im_mask.copy()
+        im_gray[im_gray > thresh_min] = 255
+        im_gray[im_gray <= thresh_min] = 0
+
+        ##! fill the gap
+        if CV_MAJOR < str(3):
+            contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+        else:
+            im, contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, \
+                                                cv.CHAIN_APPROX_SIMPLE)
+
+        max_area = 0
+        index = -1
+        for i, cnt in enumerate(contour):
+            cv.drawContours(im_gray, [cnt], 0, 255, -1)
+
+            a = cv.contourArea(cnt)
+            if max_area < a:
+                max_area = a
+                index = i
+
+        mask = None
+        if index > -1:
+            mask = np.asarray(im_gray, np.float_)
+            mask = mask / mask.max()
+
+        rect = cv.boundingRect(contour[index]) if index > -1 else None
+
+        return (mask, rect)

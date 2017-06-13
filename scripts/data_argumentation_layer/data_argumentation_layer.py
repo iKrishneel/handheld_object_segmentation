@@ -3,6 +3,8 @@
 import os
 import random
 import caffe
+import numpy as np
+import cv2 as cv
 import argumentation_engine as ae
 
 class DataArgumentationLayer(caffe.Layer):
@@ -19,11 +21,12 @@ class DataArgumentationLayer(caffe.Layer):
             params = eval(self.param_str)
             self.image_size_x = int(params['im_width'])
             self.image_size_y = int(params['im_height'])
-            self.mean = np.array(params['mean'])
+            #self.mean = np.array(params['mean'])
             self.random = bool(params.get('randomize', True))
             self.dataset_txt = str(params['filename'])
             self.directory = str(params['directory'])
-
+            self.batch_size = int(params['batch_size'])
+            
             if not os.path.isfile(self.dataset_txt):
                 raise Exception('dataset textfile not found!')
 
@@ -33,19 +36,18 @@ class DataArgumentationLayer(caffe.Layer):
             
             if self.random:
                 random.seed()
-                self.idx = random.randint(0, len(lines)-1)
+                self.idx = random.randint(0, (len(self.lines)/3)-1)
                 
             self.__ae = ae.ArgumentationEngine(self.image_size_x, self.image_size_y)
 
         except ValueError:
             raise ValueError('Parameter string missing or data type is wrong!')
-
             
     def reshape(self, bottom, top):
         #if bottom[0].data < 5:
         #    raise Exception('Labels should be 5 dimensional vector')
                 
-        n_images = bottom[0].data.shape[0]        
+        n_images = self.batch_size
         out_size_x = int(self.image_size_x / 1)
         out_size_y = int(self.image_size_y / 1)
         
@@ -54,9 +56,14 @@ class DataArgumentationLayer(caffe.Layer):
         top[2].reshape(n_images, 1, out_size_y, out_size_x)
                 
     def forward(self, bottom, top):
-        for index, data in enumerate(bottom[0].data):
+
+        for index in xrange(0, self.batch_size, 1):
+            indx = int(self.idx * 3)
+            im_rgb = cv.imread(self.lines[indx])
+            im_dep = cv.imread(self.lines[indx+1])
+            im_mask = cv.imread(self.lines[indx+2], 0)
             
-            template_datum, target_datum, label_datum = self.__ae.process(data.copy())
+            template_datum, target_datum, label_datum = self.__ae.process2(im_rgb, im_dep, im_mask)
             
             top[0].data[index] = template_datum.copy()
             top[1].data[index] = target_datum.copy()
