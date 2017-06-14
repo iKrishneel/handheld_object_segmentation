@@ -69,6 +69,8 @@ class DataArgumentationLayer(caffe.Layer):
             top[1].data[index] = target_datum.copy()
             top[2].data[index] = label_datum.copy()
 
+            self.idx = random.randint(0, (len(self.lines)/3)-1)
+
     def backward(self, top, propagate_down, bottom):
         pass
 
