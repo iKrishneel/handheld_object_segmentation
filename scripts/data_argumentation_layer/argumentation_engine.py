@@ -101,14 +101,14 @@ class ArgumentationEngine(object):
         mask_datum[mask_datum > 0.0] = 1.0
 
         ##################################
-        # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
-        # x,y,w,h = rect
-        # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
-        # mask1 = mask_datum[0].copy()
-        # mask1 = mask1.swapaxes(0, 1)
-        # cv.namedWindow('img', cv.WINDOW_NORMAL)
-        # cv.imshow('img', im_dep)
-        # cv.waitKey(0)
+        cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
+        x,y,w,h = rect
+        cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
+        mask1 = mask_datum[0].copy()
+        mask1 = mask1.swapaxes(0, 1)
+        cv.namedWindow('img', cv.WINDOW_NORMAL)
+        cv.imshow('img', rgb1)
+        cv.waitKey(0)
         ##################################
         
         return (templ_datum, target_datum, mask_datum)        

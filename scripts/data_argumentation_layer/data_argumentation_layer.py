@@ -44,8 +44,6 @@ class DataArgumentationLayer(caffe.Layer):
             raise ValueError('Parameter string missing or data type is wrong!')
             
     def reshape(self, bottom, top):
-        #if bottom[0].data < 5:
-        #    raise Exception('Labels should be 5 dimensional vector')
                 
         n_images = self.batch_size
         out_size_x = int(self.image_size_x / 1)
