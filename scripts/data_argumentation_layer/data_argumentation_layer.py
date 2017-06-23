@@ -66,7 +66,6 @@ class DataArgumentationLayer(caffe.Layer):
             
             ##! empty label (tmp test)
             if template_datum.shape == im_rgb.shape:
-                print "\n empty label detected"
                 while template_datum.shape == im_rgb.shape:
                     self.idx = random.randint(0, len(self.img_paths)-1)
                     indx = int(self.idx)
@@ -75,12 +74,11 @@ class DataArgumentationLayer(caffe.Layer):
                     im_mask = cv.imread(self.lab_paths[indx], cv.IMREAD_GRAYSCALE)
 
                     template_datum, target_datum, label_datum = self.__ae.process2(im_rgb, im_dep, im_mask)
-                print "new one found"
-                    
+
             top[0].data[index] = template_datum.copy()
             top[1].data[index] = target_datum.copy()
             top[2].data[index] = label_datum.copy()
-
+            
             self.idx = random.randint(0, len(self.img_paths)-1)
 
     def backward(self, top, propagate_down, bottom):

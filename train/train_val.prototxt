@@ -7,7 +7,7 @@ layer {
   python_param {
     module: 'data_argumentation_layer'
     layer: 'DataArgumentationLayer'
-    param_str: "{\'batch_size\': 1, \'im_width\': 227, \'im_height\': 227, \'filename\': '/home/krishneel/Documents/datasets/handheld_objects/train.txt', \'directory\': '/home/krishneel/Documents/datasets/handheld_objects/' }"
+    param_str: "{\'batch_size\': 5, \'im_width\': 227, \'im_height\': 227, \'filename\': '/home/krishneel/Documents/datasets/handheld_objects/train.txt', \'directory\': '/home/krishneel/Documents/datasets/handheld_objects/' }"
     }
 }
 
