@@ -32,7 +32,7 @@ class ArgumentationEngine(object):
         im_mask = cv.flip(in_mask, flip_flag)
 
         im_rgb = self.demean_rgb_image(im_rgb)
-        im_dep = im_dep.astype(np.float)
+        im_dep = im_dep.astype(np.float32)
         im_dep /= im_dep.max()
         
         return self.generate_argumented_data(im_rgb, im_dep, im_mask)
@@ -44,7 +44,7 @@ class ArgumentationEngine(object):
 
         # rect = self.bounding_rect(im_mask)
         im_mask, rect = self.create_mask_labels(in_mask)
-        im_mask = im_mask.astype(np.float)
+        im_mask = im_mask.astype(np.float32)
         im_mask /= im_mask.max()
         
         ##! crop region around the object
@@ -99,16 +99,18 @@ class ArgumentationEngine(object):
         target_datum = tgt_datum[0:6].copy()
         mask_datum = tgt_datum[6:7].copy()
         mask_datum[mask_datum > 0.0] = 1.0
-        
+
+        ##################################
         # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
         # x,y,w,h = rect
         # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
         # mask1 = mask_datum[0].copy()
         # mask1 = mask1.swapaxes(0, 1)
         # cv.namedWindow('img', cv.WINDOW_NORMAL)
-        # cv.imshow('img', im_rgb)
+        # cv.imshow('img', im_dep)
         # cv.waitKey(0)
-
+        ##################################
+        
         return (templ_datum, target_datum, mask_datum)        
 
     def crop_and_resize_inputs(self, im_rgb, im_dep, im_mask, rect):
@@ -130,7 +132,7 @@ class ArgumentationEngine(object):
         K = rgb.shape[2] + dep.shape[2]
         if not mask is None:
             K += 1
-        datum = np.zeros((K, W, H), np.float)
+        datum = np.zeros((K, W, H), np.float32)
         rgb = rgb.swapaxes(2, 0)
         rgb = rgb.swapaxes(2, 1)
         datum[0:3] = rgb
@@ -160,10 +162,10 @@ class ArgumentationEngine(object):
         return np.array([x1, y1, x2 - x1, y2 - y1])
                     
     def demean_rgb_image(self, im_rgb):
-        im_rgb = im_rgb.astype(float)
-        im_rgb[:, :, 0] -= float(104.0069879317889)
-        im_rgb[:, :, 1] -= float(116.66876761696767)
-        im_rgb[:, :, 2] -= float(122.6789143406786)
+        im_rgb = im_rgb.astype(np.float32)
+        im_rgb[:, :, 0] -= np.float32(104.0069879317889)
+        im_rgb[:, :, 1] -= np.float32(116.66876761696767)
+        im_rgb[:, :, 2] -= np.float32(122.6789143406786)
         im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
         return im_rgb
         
@@ -197,7 +199,7 @@ class ArgumentationEngine(object):
 
         mask = None
         if index > -1:
-            mask = np.asarray(im_gray, np.float_)
+            mask = np.asarray(im_gray, np.float32)
             mask = mask / mask.max()
 
         rect = cv.boundingRect(contour[index]) if index > -1 else None

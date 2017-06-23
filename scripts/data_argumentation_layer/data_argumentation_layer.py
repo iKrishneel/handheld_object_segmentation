@@ -64,7 +64,7 @@ class DataArgumentationLayer(caffe.Layer):
             im_mask = cv.imread(self.lines[indx+2], 0)
             
             template_datum, target_datum, label_datum = self.__ae.process2(im_rgb, im_dep, im_mask)
-            
+
             top[0].data[index] = template_datum.copy()
             top[1].data[index] = target_datum.copy()
             top[2].data[index] = label_datum.copy()
