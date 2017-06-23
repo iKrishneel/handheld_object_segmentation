@@ -19,5 +19,5 @@ fname=$(date "+%Y-%m-%d-%H.%M-%S")
 
 $CAFFE_ROOT/build/tools/caffe train --solver=solver.prototxt \
     --gpu=0 \
-    --weights=/home/krishneel/caffe/models/ilsvrc14/vgg16/VGG_ILSVRC_16_layers.caffemodel \
+    --weights=$CAFFE_ROOT/models/bvlc_reference_caffenet/bvlc_reference_caffenet.caffemodel \
     2>&1 | tee -a $pkg/handheld_object_$fname.log

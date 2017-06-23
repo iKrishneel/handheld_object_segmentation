@@ -53,32 +53,16 @@ class ArgumentationEngine(object):
         
         ##! crop region around the object
         x, y, w, h = rect
-        # cx, cy = (x + w/2.0, y + h/2.0)
-
         sindx = int(random.randint(0, len(self.__scales) - 1))
         s = self.__scales[sindx]
-
-        # nw = int(s * w)
-        # nh = int(s * h)
-        # nx = int(cx - nw/2.0)
-        # ny = int(cy - nh/2.0)
-
-        # nx = 0 if nx < 0 else nx
-        # ny = 0 if ny < 0 else ny
-        # nw = nw-((nx+nw)-im_rgb.shape[1]) if (nx+nw) > im_rgb.shape[1] else nw
-        # nh = nh-((ny+nh)-im_rgb.shape[0]) if (ny+nh) > im_rgb.shape[0] else nh
-
-        # bbox = np.array([nx, ny, nw, nh])
         bbox = self.get_region_bbox(im_rgb, rect, s)
         rgb, dep, mask = self.crop_and_resize_inputs(im_rgb, im_dep, im_mask, bbox)
-
 
         ###### target cropping
         if self.__variable_scaling:
             sindx = int(random.randint(0, len(self.__scales) - 1))
             s = self.__scales[sindx]
             bbox = self.get_region_bbox(im_rgb, rect, s)
-
 
         r = random.randint(-min(w/2, h/2), min(w/2, h/2))
         box = bbox
@@ -103,6 +87,11 @@ class ArgumentationEngine(object):
         box[1] = y
             
         rgb1, dep1, mask1 = self.crop_and_resize_inputs(im_rgb, im_dep, im_mask, box)
+
+        #####
+        ## ToDo: color space argumentation
+        ####
+
             
         templ_datum = self.pack_array(rgb, dep)
         tgt_datum = self.pack_array(rgb1, dep1, mask1)
@@ -111,19 +100,21 @@ class ArgumentationEngine(object):
         target_datum = tgt_datum[0:6].copy()
         mask_datum = tgt_datum[6:7].copy()
         mask_datum[mask_datum > 0.0] = 1.0
+        
+        #! for softmaxloss
+        mask_datum = mask_datum.astype(np.uint8)
 
         ##################################
-        cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
-        x,y,w,h = rect
-        cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
-        mask1 = mask_datum[0].copy()
-        mask1 = mask1.swapaxes(0, 1)
+        # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 0, 255), 3)
+        # x,y,w,h = rect
+        # cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
+        # mask1 = mask_datum[0].copy()
+        # mask1 = mask1.swapaxes(0, 1)
         
-        z = np.hstack((rgb1, dep1, rgb, dep))
-
-        cv.namedWindow('img', cv.WINDOW_NORMAL)
-        cv.imshow('img', z)
-        cv.waitKey(0)
+        # z = np.hstack((rgb1, dep1, rgb, dep))
+        # cv.namedWindow('img', cv.WINDOW_NORMAL)
+        # cv.imshow('img', z)
+        # cv.waitKey(0)
         ##################################
         
         return (templ_datum, target_datum, mask_datum)        

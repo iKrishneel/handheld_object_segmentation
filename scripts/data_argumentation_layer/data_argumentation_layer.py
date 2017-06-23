@@ -21,7 +21,7 @@ class DataArgumentationLayer(caffe.Layer):
             params = eval(self.param_str)
             self.image_size_x = int(params['im_width'])
             self.image_size_y = int(params['im_height'])
-            #self.mean = np.array(params['mean'])
+            self.var_scale = bool(params.get('var_scale', False))
             self.random = bool(params.get('randomize', True))
             self.dataset_txt = str(params['filename'])
             self.directory = str(params['directory'])
@@ -39,7 +39,7 @@ class DataArgumentationLayer(caffe.Layer):
                 random.seed()
                 self.idx = random.randint(0, len(self.img_paths)-1)
                 
-            self.__ae = ae.ArgumentationEngine(self.image_size_x, self.image_size_y)
+            self.__ae = ae.ArgumentationEngine(self.image_size_x, self.image_size_y, self.var_scale)
 
         except ValueError:
             raise ValueError('Parameter string missing or data type is wrong!')
@@ -61,12 +61,6 @@ class DataArgumentationLayer(caffe.Layer):
             im_rgb = cv.imread(self.img_paths[indx])
             im_dep = cv.imread(self.dep_paths[indx])
             im_mask = cv.imread(self.lab_paths[indx], cv.IMREAD_COLOR)
-            
-
-            # z = np.hstack((im_rgb, im_dep, im_mask))
-            # cv.namedWindow("input", cv.WINDOW_NORMAL)
-            # cv.imshow("input", z)
-            # cv.waitKey(0)
             
             template_datum, target_datum, label_datum = self.__ae.process2(im_rgb, im_dep, im_mask)
             top[0].data[index] = template_datum.copy()

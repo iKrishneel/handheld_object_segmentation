@@ -1,11 +1,13 @@
-base_lr: 1e-3
 train_net: "train_val.prototxt"
+base_lr: 1e-4
 display: 20
 average_loss: 20
 lr_policy: "fixed"
 momentum: 0.9
-iter_size: 1
+iter_size: 20
 max_iter: 1
 weight_decay: 0.0005
 snapshot: 4000
 snapshot_prefix: "snapshots/snapshot"
+solver_type: ADAM
+solver_mode: GPU
