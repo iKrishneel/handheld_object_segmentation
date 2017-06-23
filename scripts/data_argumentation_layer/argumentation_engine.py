@@ -48,6 +48,10 @@ class ArgumentationEngine(object):
         
         # rect = self.bounding_rect(im_mask)
         im_mask, rect = self.create_mask_labels(in_mask)
+        
+        if rect is None or im_mask is None:
+            return im_rgb, im_dep, im_mask
+
         im_mask = im_mask.astype(np.float32)
         im_mask /= im_mask.max()
         
