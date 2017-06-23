@@ -30,13 +30,14 @@ class DataArgumentationLayer(caffe.Layer):
             if not os.path.isfile(self.dataset_txt):
                 raise Exception('dataset textfile not found!')
 
-            self.lines = self.read_data_from_textfile()
-            if len(self.lines) < 3:
+            self.img_paths, self.dep_paths, self.lab_paths = self.read_data_from_textfile()
+
+            if self.img_paths.shape[0] != self.dep_paths.shape[0] != self.lab_paths.shape[0]:
                 raise Exception('Empty text file')
             
             if self.random:
                 random.seed()
-                self.idx = random.randint(0, (len(self.lines)/3)-1)
+                self.idx = random.randint(0, len(self.img_paths)-1)
                 
             self.__ae = ae.ArgumentationEngine(self.image_size_x, self.image_size_y)
 
@@ -56,18 +57,23 @@ class DataArgumentationLayer(caffe.Layer):
     def forward(self, bottom, top):
 
         for index in xrange(0, self.batch_size, 1):
-            indx = int(self.idx * 3)
-            im_rgb = cv.imread(self.lines[indx])
-            im_dep = cv.imread(self.lines[indx+1])
-            im_mask = cv.imread(self.lines[indx+2], 0)
+            indx = int(self.idx)
+            im_rgb = cv.imread(self.img_paths[indx])
+            im_dep = cv.imread(self.dep_paths[indx])
+            im_mask = cv.imread(self.lab_paths[indx], cv.IMREAD_COLOR)
+            
+
+            # z = np.hstack((im_rgb, im_dep, im_mask))
+            # cv.namedWindow("input", cv.WINDOW_NORMAL)
+            # cv.imshow("input", z)
+            # cv.waitKey(0)
             
             template_datum, target_datum, label_datum = self.__ae.process2(im_rgb, im_dep, im_mask)
-
             top[0].data[index] = template_datum.copy()
             top[1].data[index] = target_datum.copy()
             top[2].data[index] = label_datum.copy()
 
-            self.idx = random.randint(0, (len(self.lines)/3)-1)
+            self.idx = random.randint(0, len(self.img_paths)-1)
 
     def backward(self, top, propagate_down, bottom):
         pass
@@ -83,13 +89,15 @@ class DataArgumentationLayer(caffe.Layer):
         for index in xrange(0, len(lines), 3):
             img_lists.append(lines[index].split()[0])
 
-        lines = []
+        img_paths = []
+        dep_paths = []
+        lab_paths = []
         for line in img_lists:
             p = line.split(os.sep)
             dep_path = self.directory + p[-3] + '/depth/' + p[-1]
             msk_path = self.directory + p[-3] + '/mask/' + p[-1]
-            lines.append(line)
-            lines.append(dep_path)
-            lines.append(msk_path)
-
-        return np.array(lines)
+            img_paths.append(line)
+            dep_paths.append(dep_path)
+            lab_paths.append(msk_path)
+            
+        return np.array(img_paths), np.array(dep_paths), np.array(lab_paths)

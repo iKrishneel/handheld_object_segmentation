@@ -8,9 +8,10 @@ import cv2 as cv
 (CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
 
 class ArgumentationEngine(object):
-    def __init__(self, im_width, im_height):
+    def __init__(self, im_width, im_height, var_scaling = False):
         self.__in_size = (im_width, im_height)
-        self.__scales = np.array([1.5, 1.75, 2.0]) #! predefined scaling
+        self.__scales = np.array([1.25, 1.5, 1.75, 2.0, 2.25, 2.5]) #! predefined scaling
+        self.__variable_scaling = var_scaling
 
     def process(self, in_data):
 
@@ -31,6 +32,9 @@ class ArgumentationEngine(object):
         im_dep = cv.flip(in_dep, flip_flag)
         im_mask = cv.flip(in_mask, flip_flag)
 
+        if len(im_mask.shape) == 3:
+            im_mask = cv.cvtColor(im_mask, cv.COLOR_BGR2GRAY)
+
         im_rgb = self.demean_rgb_image(im_rgb)
         im_dep = im_dep.astype(np.float32)
         im_dep /= im_dep.max()
@@ -41,7 +45,7 @@ class ArgumentationEngine(object):
     Function to pack the template data and the search target region.
     """
     def generate_argumented_data(self, im_rgb, im_dep, in_mask):
-
+        
         # rect = self.bounding_rect(im_mask)
         im_mask, rect = self.create_mask_labels(in_mask)
         im_mask = im_mask.astype(np.float32)
@@ -49,24 +53,32 @@ class ArgumentationEngine(object):
         
         ##! crop region around the object
         x, y, w, h = rect
-        cx, cy = (x + w/2.0, y + h/2.0)
+        # cx, cy = (x + w/2.0, y + h/2.0)
 
-        sindx = int(random.randint(0, 2))
+        sindx = int(random.randint(0, len(self.__scales) - 1))
         s = self.__scales[sindx]
 
-        nw = int(s * w)
-        nh = int(s * h)
-        nx = int(cx - nw/2.0)
-        ny = int(cy - nh/2.0)
+        # nw = int(s * w)
+        # nh = int(s * h)
+        # nx = int(cx - nw/2.0)
+        # ny = int(cy - nh/2.0)
 
-        nx = 0 if nx < 0 else nx
-        ny = 0 if ny < 0 else ny
-        nw = nw-((nx+nw)-im_rgb.shape[1]) if (nx+nw) > im_rgb.shape[1] else nw
-        nh = nh-((ny+nh)-im_rgb.shape[0]) if (ny+nh) > im_rgb.shape[0] else nh
+        # nx = 0 if nx < 0 else nx
+        # ny = 0 if ny < 0 else ny
+        # nw = nw-((nx+nw)-im_rgb.shape[1]) if (nx+nw) > im_rgb.shape[1] else nw
+        # nh = nh-((ny+nh)-im_rgb.shape[0]) if (ny+nh) > im_rgb.shape[0] else nh
 
-        bbox = np.array([nx, ny, nw, nh])
-        
+        # bbox = np.array([nx, ny, nw, nh])
+        bbox = self.get_region_bbox(im_rgb, rect, s)
         rgb, dep, mask = self.crop_and_resize_inputs(im_rgb, im_dep, im_mask, bbox)
+
+
+        ###### target cropping
+        if self.__variable_scaling:
+            sindx = int(random.randint(0, len(self.__scales) - 1))
+            s = self.__scales[sindx]
+            bbox = self.get_region_bbox(im_rgb, rect, s)
+
 
         r = random.randint(-min(w/2, h/2), min(w/2, h/2))
         box = bbox
@@ -106,12 +118,34 @@ class ArgumentationEngine(object):
         cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 3)
         mask1 = mask_datum[0].copy()
         mask1 = mask1.swapaxes(0, 1)
+        
+        z = np.hstack((rgb1, dep1, rgb, dep))
+
         cv.namedWindow('img', cv.WINDOW_NORMAL)
-        cv.imshow('img', rgb1)
+        cv.imshow('img', z)
         cv.waitKey(0)
         ##################################
         
         return (templ_datum, target_datum, mask_datum)        
+
+    def get_region_bbox(self, im_rgb, rect, s):
+        x, y, w, h = rect
+        cx, cy = (x + w/2.0, y + h/2.0)
+
+        sindx = int(random.randint(0, len(self.__scales) - 1))
+        s = self.__scales[sindx]
+
+        nw = int(s * w)
+        nh = int(s * h)
+        nx = int(cx - nw/2.0)
+        ny = int(cy - nh/2.0)
+
+        nx = 0 if nx < 0 else nx
+        ny = 0 if ny < 0 else ny
+        nw = nw-((nx+nw)-im_rgb.shape[1]) if (nx+nw) > im_rgb.shape[1] else nw
+        nh = nh-((ny+nh)-im_rgb.shape[0]) if (ny+nh) > im_rgb.shape[0] else nh
+
+        return np.array([nx, ny, nw, nh])
 
     def crop_and_resize_inputs(self, im_rgb, im_dep, im_mask, rect):
         x, y, w, h = rect
