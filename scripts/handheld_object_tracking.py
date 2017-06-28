@@ -34,11 +34,11 @@ class HandHheldObjectTracking():
         self.__templ_rgb = None
         self.__templ_dep = None
         self.__templ_datum = None
-        self.__scale = 1.50
+        self.__scale = 1.250
         
         ###! temp
-        self.__weights = '/media/volume/programs/handheld/snapshot_iter_2058.caffemodel'
-        self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
+        self.__weights = '/home/krishneel/Documents/caffe-tutorials/detection/handheld/snapshot_iter_2966.caffemodel'
+        self.__model_proto = '/home/krishneel/Documents/caffe-tutorials/detection/handheld/deploy.prototxt'
 
         if self.is_file_valid():
             self.load_caffe_model()
@@ -48,6 +48,7 @@ class HandHheldObjectTracking():
 
 
     def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
+        
         ##!crop (build multiple scale)
         rect = self.get_region_bbox(im_rgb, rect, scale)
         x,y,w,h = rect
@@ -59,9 +60,13 @@ class HandHheldObjectTracking():
         ##! resize to network input
         im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
         im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
-
+        
         ##! normalize and encode
-        im_rgb = self.demean_rgb_image(im_rgb)
+        #im_rgb = self.demean_rgb_image(im_rgb)
+        im_rgb = im_rgb.astype(np.float32)
+        im_rgb /= im_rgb.max()
+        im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
+        
         im_dep = im_dep.astype(np.float32) \
                  if not im_dep.dtype is str('float32') else  im_dep
         im_dep /= im_dep.max()
@@ -69,6 +74,10 @@ class HandHheldObjectTracking():
         im_dep = im_dep.astype(np.uint8)
         im_dep = cv.applyColorMap(im_dep, cv.COLORMAP_JET)
 
+        im_dep = im_dep.astype(np.float32)
+        im_dep /= im_dep.max()
+        im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
+        
         #! transpose to c, h, w
         im_rgb = im_rgb.transpose((2, 0, 1))
         im_dep = im_dep.transpose((2, 0, 1))
@@ -85,11 +94,12 @@ class HandHheldObjectTracking():
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
 
+        ##im_dep[im_dep > 1.50] = 100.0
         image, im_datum, rect = self.process_rgbd(im_rgb, im_dep, self.__rect, self.__scale)
         
         if self.__templ_datum is None:
             self.__templ_datum = im_datum.copy()
-            self.__scale = 1.50
+            self.__scale = 1.250
             
         # cv.namedWindow("depth", cv.WINDOW_NORMAL)
         # cv.imshow("depth", im_dep)
@@ -102,18 +112,17 @@ class HandHheldObjectTracking():
 
         output = self.__net.forward()
         
-        # self.__templ_datum = im_datum.copy()
+        #! self.__templ_datum = im_datum.copy()
 
 
         feat = self.__net.blobs['score'].data[0]
         prob = feat[1].copy()
-        prob[prob < 0.5] = 0.0
-        prob[prob >= 0.5] = 1.0
+        #prob[prob < 0.5] = 0.0
+        #prob[prob >= 0.5] = 1.0
         prob *= 255
         prob = prob.astype(np.uint8)
         
         prob = cv.resize(prob, (rect[2], rect[3]))
-
 
         #! get rect
         bbox = self.bounding_rect(prob)
@@ -124,15 +133,14 @@ class HandHheldObjectTracking():
 
         x, y, w, h = bbox
         cv.rectangle(im_rgb, (x, y), (x+w, h+y), (0, 255, 0), 4)
-        
 
         res = cv.bitwise_and(image, image,mask = prob)
         
         prob = cv.applyColorMap(prob, cv.COLORMAP_JET)
         res = np.hstack((res, prob))
 
-        cv.namedWindow("depth", cv.WINDOW_NORMAL)
-        cv.imshow("depth", res)
+        cv.namedWindow("region", cv.WINDOW_NORMAL)
+        cv.imshow("region", res)
 
         cv.namedWindow("rgb", cv.WINDOW_NORMAL)
         cv.imshow("rgb", im_rgb)
