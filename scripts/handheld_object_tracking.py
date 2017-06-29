@@ -17,6 +17,8 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PolygonStamped as Rect
 
+(CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
+
 class HandHheldObjectTracking():
     def __init__(self):
         self.__net = None
@@ -31,7 +33,7 @@ class HandHheldObjectTracking():
         self.__device_id = rospy.get_param('device_id', 0)
 
         self.__scale = 1.250  #! deprecated
-        self.__scales = np.array([2.0], dtype = np.float32)
+        self.__scales = np.array([1.250], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
@@ -41,8 +43,8 @@ class HandHheldObjectTracking():
         #! self.__templ_dep = None
 
         ###! temp
-        self.__weights = '/media/volume/programs/handheld/snapshot_iter_2966.caffemodel'
-        self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
+        self.__weights = '/home/krishneel/Documents/caffe-tutorials/detection/handheld/snapshot_iter_2966.caffemodel'
+        self.__model_proto = '/home/krishneel/Documents/caffe-tutorials/detection/handheld/deploy.prototxt'
 
         if self.is_file_valid():
             self.load_caffe_model()
@@ -52,12 +54,26 @@ class HandHheldObjectTracking():
                                     self.__im_height, self.__im_width), np.float32)        
 
         self.__image_pub = rospy.Publisher('/probability_map', Image, queue_size = 1)
+        self.__image_pub2 = rospy.Publisher('/region', Image, queue_size = 1)
 
 
         self.subscribe()
 
 
     def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
+
+        ##!crop (build multiple scale)
+        rect = self.get_region_bbox(im_rgb, rect, scale)
+        x,y,w,h = rect
+        im_rgb = im_rgb[y:y+h, x:x+w].copy()
+        im_dep = im_dep[y:y+h, x:x+w].copy()
+
+        
+        image = im_rgb.copy()
+
+        ##! resize to network input
+        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
+        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
 
         ##! normalize and encode
         im_rgb = im_rgb.astype(np.float32)
@@ -74,19 +90,6 @@ class HandHheldObjectTracking():
         im_dep = im_dep.astype(np.float32)
         im_dep /= im_dep.max()
         im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
-
-        ##!crop (build multiple scale)
-        rect = self.get_region_bbox(im_rgb, rect, scale)
-        x,y,w,h = rect
-        im_rgb = im_rgb[y:y+h, x:x+w].copy()
-        im_dep = im_dep[y:y+h, x:x+w].copy()
-
-        
-        image = im_rgb.copy()
-
-        ##! resize to network input
-        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
-        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
         
         #! transpose to c, h, w
         im_rgb = im_rgb.transpose((2, 0, 1))
@@ -113,17 +116,16 @@ class HandHheldObjectTracking():
 
         if self.__templ_datum is None:
             self.__templ_datum = self.__im_datum.copy()
-            # self.__scale = 1.50
+            self.__scales[0] = 1.500
 
-
-
+            
         self.__net.blobs['target_data'].data[...] = self.__im_datum.copy()
         self.__net.blobs['template_data'].data[...] = self.__templ_datum.copy()
 
         output = self.__net.forward()
         
         end = time.clock()
-        print "Duration: ", end - start
+        # print "Duration: ", end - start
 
         self.__templ_datum = self.__im_datum.copy()
 
@@ -138,34 +140,39 @@ class HandHheldObjectTracking():
             prob *= 255
             prob = prob.astype(np.uint8)
             prob = cv.resize(prob, (rect[2], rect[3]))
-
+            
             kernel = np.ones((7, 7), np.uint8)
             prob = cv.erode(prob, kernel, iterations = 1)
+
+            # prob_out = cv.applyColorMap(prob, cv.COLORMAP_JET)
             
             prob = cv.GaussianBlur(prob, (5, 5), 0)
             _, prob = cv.threshold(prob, 0, 255,cv.THRESH_BINARY + cv.THRESH_OTSU)
 
-
-            ##! > change to countour
-            bbox = cv.boundingRect(cv.findNonZero(prob))
-            bbox = np.array(bbox)
-
-
-
+            bbox = self.create_mask_rect(prob, rect)
+            if bbox is None:
+                rospy.logerr('OBJECT REGION NOT FOUND')
+                # sys.exit()
+                return
+                
+            bbox = np.array(bbox, dtype=np.int)
             bbox[0] += rect[0]
             bbox[1] += rect[1]
 
-            self.__rect = bbox
+            #! enlarge by padding
+            bbox = self.get_bbox(im_rgb, bbox, 8)
 
+            self.__rect = bbox.copy()
+
+            
             x, y, w, h = bbox
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(h+y)), (0, 255, 0), 4)
             #cv.namedWindow("region", cv.WINDOW_NORMAL)
             #cv.imshow("region", im_rgb)
             #cv.waitKey(20)
 
-            #self.__image_pub.publish(self.__bridge.cv2_to_imgmsg(prob, "mono8"))
-            self.__image_pub.publish(self.__bridge.cv2_to_imgmsg(im_rgb, "bgr8"))
-
+            self.__image_pub.publish(self.__bridge.cv2_to_imgmsg(prob, "mono8"))
+            self.__image_pub2.publish(self.__bridge.cv2_to_imgmsg(im_rgb, "bgr8"))
 
             ###--------------------------------
             return
@@ -194,6 +201,59 @@ class HandHheldObjectTracking():
             if cv.waitKey(1) & 0xFF == ord("q"):
                 return
 
+                
+    def create_mask_rect(self, im_gray, rect):  #! rect used for cropping
+        if len(im_gray.shape) is None:
+            print 'ERROR: Empty input mask'
+            return
+
+        if CV_MAJOR < str(3):
+            contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+        else:
+            im, contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, \
+                                                cv.CHAIN_APPROX_SIMPLE)
+
+        prev_center = np.array([self.__rect[0] + self.__rect[2]/2.0, self.__rect[1] + self.__rect[3]/2.0])
+
+        use_area = True
+        max_area = 0
+        min_distance = sys.float_info.max
+        index = -1
+        for i, cnt in enumerate(contour):
+            if not use_area:
+                box = cv.boundingRect(contour[index])
+                center = np.array([box[0] + rect[0] + box[2] / 2.0, \
+                                   box[1] + rect[1] + box[3] / 2.0])
+                distance = np.linalg.norm(prev_center - center)
+
+                if distance < min_distance:
+                    min_distance = distance
+                    index = i
+
+            a = cv.contourArea(cnt)
+            if max_area < a:
+                max_area = a
+                index = i
+            
+        rect = cv.boundingRect(contour[index]) if index > -1 else None
+        return rect
+
+
+    def get_bbox(self, im_rgb, rect, pad = 8):
+        x, y, w, h = rect
+
+        nx = int(x - pad)
+        ny = int(y - pad)
+        nw = int(w  + (2 * pad))
+        nh = int(h  + (2 * pad))
+        
+        nx = 0 if nx < 0 else nx
+        ny = 0 if ny < 0 else ny
+        nw = nw-((nx+nw)-im_rgb.shape[1]) if (nx+nw) > im_rgb.shape[1] else nw
+        nh = nh-((ny+nh)-im_rgb.shape[0]) if (ny+nh) > im_rgb.shape[0] else nh
+        
+        return np.array([nx, ny, nw, nh])
+        
     """
     image callback function
     """
