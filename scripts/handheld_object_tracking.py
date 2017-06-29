@@ -15,6 +15,7 @@ import time
 import message_filters
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import Point32
 from geometry_msgs.msg import PolygonStamped as Rect
 
 (CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
@@ -32,19 +33,15 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
-        self.__scale = 1.250  #! deprecated
         self.__scales = np.array([1.250], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
         self.__templ_datum = None
 
-        #! self.__templ_rgb = None
-        #! self.__templ_dep = None
-
         ###! temp
-        self.__weights = '/home/krishneel/Documents/caffe-tutorials/detection/handheld/snapshot_iter_2966.caffemodel'
-        self.__model_proto = '/home/krishneel/Documents/caffe-tutorials/detection/handheld/deploy.prototxt'
+        self.__weights = '/media/volume/programs/handheld/snapshot_iter_3745.caffemodel'
+        self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
 
         if self.is_file_valid():
             self.load_caffe_model()
@@ -55,26 +52,12 @@ class HandHheldObjectTracking():
 
         self.__image_pub = rospy.Publisher('/probability_map', Image, queue_size = 1)
         self.__image_pub2 = rospy.Publisher('/region', Image, queue_size = 1)
-
+        self.__rect_pub = rospy.Publisher('/object_rect', Rect, queue_size = 1)
 
         self.subscribe()
 
 
     def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
-
-        ##!crop (build multiple scale)
-        rect = self.get_region_bbox(im_rgb, rect, scale)
-        x,y,w,h = rect
-        im_rgb = im_rgb[y:y+h, x:x+w].copy()
-        im_dep = im_dep[y:y+h, x:x+w].copy()
-
-        
-        image = im_rgb.copy()
-
-        ##! resize to network input
-        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
-        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
-
         ##! normalize and encode
         im_rgb = im_rgb.astype(np.float32)
         im_rgb /= im_rgb.max()
@@ -90,53 +73,50 @@ class HandHheldObjectTracking():
         im_dep = im_dep.astype(np.float32)
         im_dep /= im_dep.max()
         im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
+
+        ##!crop (build multiple scale)
+        rect = self.get_region_bbox(im_rgb, rect, scale)
+        x,y,w,h = rect
+        im_rgb = im_rgb[y:y+h, x:x+w].copy()
+        im_dep = im_dep[y:y+h, x:x+w].copy()
+        
+        image = im_rgb.copy()
+
+        ##! resize to network input
+        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
+        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
         
         #! transpose to c, h, w
         im_rgb = im_rgb.transpose((2, 0, 1))
         im_dep = im_dep.transpose((2, 0, 1))
 
-
-        #self.__im_datum[0][0:3, :, :] = im_rgb.copy()
-        #self.__im_datum[0][3:6, :, :] = im_dep.copy()
-
         return im_rgb, im_dep, image, rect
         
 
-    def track(self, im_rgb, im_dep):
+    def track(self, im_rgb, im_dep, header = None):
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
 
-        start = time.clock()
-
         for index, scale in enumerate(self.__scales):
-            in_rgb, in_dep, image, rect = self.process_rgbd(im_rgb, im_dep, self.__rect.copy(), scale)
+            in_rgb, in_dep, image, rect = self.process_rgbd(im_rgb, im_dep, \
+                                                            self.__rect.copy(), scale)
             self.__im_datum[index][0:3, :, :] = in_rgb.copy()
             self.__im_datum[index][3:6, :, :] = in_dep.copy()
-
 
         if self.__templ_datum is None:
             self.__templ_datum = self.__im_datum.copy()
             self.__scales[0] = 1.500
-
             
         self.__net.blobs['target_data'].data[...] = self.__im_datum.copy()
         self.__net.blobs['template_data'].data[...] = self.__templ_datum.copy()
 
         output = self.__net.forward()
-        
-        end = time.clock()
-        # print "Duration: ", end - start
 
-        self.__templ_datum = self.__im_datum.copy()
-
-
-        #im_plot = np.zeros((rect[3], rect[2]*4, 3), np.uint8)
+        update_model = True
         for index in xrange(0, self.__batch_size, 1):
             feat = self.__net.blobs['score'].data[index]
             prob = feat[1].copy()
-            
-            #prob[prob < 0.4] = 0.0
-            # prob[prob >= 0.5] = 1.0
+
             prob *= 255
             prob = prob.astype(np.uint8)
             prob = cv.resize(prob, (rect[2], rect[3]))
@@ -144,62 +124,50 @@ class HandHheldObjectTracking():
             kernel = np.ones((7, 7), np.uint8)
             prob = cv.erode(prob, kernel, iterations = 1)
 
-            # prob_out = cv.applyColorMap(prob, cv.COLORMAP_JET)
-            
             prob = cv.GaussianBlur(prob, (5, 5), 0)
-            _, prob = cv.threshold(prob, 0, 255,cv.THRESH_BINARY + cv.THRESH_OTSU)
+            _, prob = cv.threshold(prob, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
             bbox = self.create_mask_rect(prob, rect)
             if bbox is None:
+                update_model = False
                 rospy.logerr('OBJECT REGION NOT FOUND')
-                # sys.exit()
-                return
-                
+                #rospy.signal_shutdown('OBJECT SEEMS TO HAVE LOST')
+                #return
+                bbox = self.__rect
+            
             bbox = np.array(bbox, dtype=np.int)
             bbox[0] += rect[0]
             bbox[1] += rect[1]
 
             #! enlarge by padding
-            bbox = self.get_bbox(im_rgb, bbox, 8)
+            bbox = self.get_bbox(im_rgb, bbox, 10)
 
-            self.__rect = bbox.copy()
-
+            area_ratio = float(bbox[2] * bbox[3]) / float(self.__rect[2] * self.__rect[3])
+            print area_ratio, " ", bbox,  " ", self.__rect
+            if area_ratio > 0.5 and area_ratio < 2 :
+                self.__rect = bbox.copy()
             
             x, y, w, h = bbox
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(h+y)), (0, 255, 0), 4)
-            #cv.namedWindow("region", cv.WINDOW_NORMAL)
-            #cv.imshow("region", im_rgb)
-            #cv.waitKey(20)
+
 
             self.__image_pub.publish(self.__bridge.cv2_to_imgmsg(prob, "mono8"))
             self.__image_pub2.publish(self.__bridge.cv2_to_imgmsg(im_rgb, "bgr8"))
 
-            ###--------------------------------
-            return
-            #im_plot[0:prob.shape[0], index * prob.shape[1]:prob.shape[1] * index + prob.shape[1], :] = prob.copy()
+            rect_msg = Rect()
+            rect_msg.header = header
+            pt = Point32()
+            pt.x = bbox[0]
+            pt.y = bbox[1]
+            rect_msg.polygon.points.append(pt)
+            pt = Point32()
+            pt.x = bbox[2] + bbox[0]
+            pt.y = bbox[3] + bbox[1]
+            rect_msg.polygon.points.append(pt)
+            self.__rect_pub.publish(rect_msg)
             
-            #! get rect
-            bbox = self.bounding_rect(prob)
-            bbox[0] = rect[0]
-            bbox[1] = rect[1]
-        
-            #self.__rect = bbox
-
-            x, y, w, h = bbox
-            cv.rectangle(im_rgb, (x, y), (x+w, h+y), (0, 255, 0), 4)
-
-            res = cv.bitwise_and(image, image,mask = prob)
-        
-            prob = cv.applyColorMap(prob, cv.COLORMAP_JET)
-            res = np.hstack((res, prob))
-
-            cv.namedWindow("region", cv.WINDOW_NORMAL)
-            cv.imshow("region", res)
-
-            #cv.namedWindow("rgb", cv.WINDOW_NORMAL)
-            #cv.imshow("rgb", im_rgb)
-            if cv.waitKey(1) & 0xFF == ord("q"):
-                return
+        if update_model:
+            self.__templ_datum = self.__im_datum.copy()
 
                 
     def create_mask_rect(self, im_gray, rect):  #! rect used for cropping
@@ -213,7 +181,8 @@ class HandHheldObjectTracking():
             im, contour, hier = cv.findContours(im_gray.copy(), cv.RETR_CCOMP, \
                                                 cv.CHAIN_APPROX_SIMPLE)
 
-        prev_center = np.array([self.__rect[0] + self.__rect[2]/2.0, self.__rect[1] + self.__rect[3]/2.0])
+        prev_center = np.array([self.__rect[0] + self.__rect[2]/2.0, \
+                                self.__rect[1] + self.__rect[3]/2.0])
 
         use_area = True
         max_area = 0
@@ -269,7 +238,8 @@ class HandHheldObjectTracking():
 
 
         if not self.__rect is None:
-            self.track(im_rgb, im_dep)
+            self.track(im_rgb, im_dep, image_msg.header)
+
         else:
             rospy.loginfo_throttle(60, 'Object not initialized ...')
 
@@ -364,11 +334,6 @@ class HandHheldObjectTracking():
     def load_caffe_model(self):
         rospy.loginfo('LOADING CAFFE MODEL..')
         self.__net = caffe.Net(self.__model_proto, self.__weights, caffe.TEST)
-        
-        # self.__transformer = caffe.io.Transformer({'data': self.__net.blobs['data'].data.shape})
-        # self.__transformer.set_transpose('data', (2,0,1))
-        # self.__transformer.set_raw_scale('data', 1)
-        # self.__transformer.set_channel_swap('data', (2,1,0))
 
         shape = self.__net.blobs['target_data'].data.shape
         self.__channels = shape[1]
