@@ -1,0 +1,12 @@
+<launch>
+  <arg name="points" default="/camera/depth_registered/points" />
+  <arg name="rect" default="/object_rect" />
+  <arg name="mask" default="/probability_map" />
+  <!-- <arg name="rect" default="/camera/rgb/image_rect_color/screenrectangle" /> -->
+  <node pkg="handheld_object_segmentation" type="handheld_object_registration"
+	name="handheld_object_registration" output="screen" >
+    <remap from="points" to="$(arg points)"/>
+    <remap from="rect" to="$(arg rect)"/>
+    <remap from="mask" to="$(arg mask)"/>
+  </node>
+</launch>

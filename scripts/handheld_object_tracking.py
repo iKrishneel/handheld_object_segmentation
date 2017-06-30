@@ -85,6 +85,7 @@ class HandHheldObjectTracking():
         ##! resize to network input
         im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
         im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
+
         
         #! transpose to c, h, w
         im_rgb = im_rgb.transpose((2, 0, 1))
@@ -96,12 +97,14 @@ class HandHheldObjectTracking():
     def track(self, im_rgb, im_dep, header = None):
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
-
+        
+        crop_rects = []
         for index, scale in enumerate(self.__scales):
             in_rgb, in_dep, image, rect = self.process_rgbd(im_rgb, im_dep, \
                                                             self.__rect.copy(), scale)
             self.__im_datum[index][0:3, :, :] = in_rgb.copy()
             self.__im_datum[index][3:6, :, :] = in_dep.copy()
+            crop_rects.append(rect)
 
         if self.__templ_datum is None:
             self.__templ_datum = self.__im_datum.copy()
@@ -142,16 +145,28 @@ class HandHheldObjectTracking():
             #! enlarge by padding
             bbox = self.get_bbox(im_rgb, bbox, 10)
 
+            ##! crop prob to rect size
+            # x = int(bbox[0] - crop_rects[index][0])
+            # y = int(bbox[1] - crop_rects[index][1])
+            # w = int(bbox[2])
+            # h = int(bbox[3])
+            #prob = prob[y:y+h, x:x+w]
+
+            im_mask = np.zeros((im_rgb.shape[0], im_rgb.shape[1]), dtype = np.uint8)
+            x,y,w,h = crop_rects[index]
+            im_mask[y:y+h, x:x+w] = prob
+
             area_ratio = float(bbox[2] * bbox[3]) / float(self.__rect[2] * self.__rect[3])
-            print area_ratio, " ", bbox,  " ", self.__rect
             if area_ratio > 0.5 and area_ratio < 2 :
                 self.__rect = bbox.copy()
             
             x, y, w, h = bbox
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(h+y)), (0, 255, 0), 4)
 
-
-            self.__image_pub.publish(self.__bridge.cv2_to_imgmsg(prob, "mono8"))
+            ##! reduce mask by scale
+            prob_msg = self.__bridge.cv2_to_imgmsg(im_mask, "mono8")
+            prob_msg.header = header
+            self.__image_pub.publish(prob_msg)
             self.__image_pub2.publish(self.__bridge.cv2_to_imgmsg(im_rgb, "bgr8"))
 
             rect_msg = Rect()
