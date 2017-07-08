@@ -40,7 +40,7 @@ class HandHheldObjectTracking():
         self.__templ_datum = None
 
         ###! temp
-        self.__weights = '/media/volume/programs/handheld/snapshot_iter_3745.caffemodel'
+        self.__weights = '/media/volume/programs/handheld/snapshot_iter_4905.caffemodel'
         self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
 
         if self.is_file_valid():
