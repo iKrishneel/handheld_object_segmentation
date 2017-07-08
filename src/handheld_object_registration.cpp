@@ -129,35 +129,34 @@ void HandheldObjectRegistration::cloudCB(
           }
        }
     }
-
     
     // this->voxel_grid_.setInputCloud(src_pts);
     // this->voxel_grid_.filter(*src_pts);
 
-
-    // this->voxel_grid_.setInputCloud(mask_cloud);
-    // this->voxel_grid_.filter(*mask_cloud);
-
+    this->voxel_grid_.setInputCloud(mask_cloud);
+    this->voxel_grid_.filter(*mask_cloud);
     
     //! clustering
     // this->spatialClustering(src_pts);
     
     //! demean
-    // Eigen::Vector4f centroid;
-    // pcl::compute3DCentroid(*src_pts, centroid);
-    // pcl::demeanPointCloud<PointNormalT, float>(*src_pts, centroid, *src_pts);
+    Eigen::Vector4f centroid;
+    pcl::compute3DCentroid(*src_pts, centroid);
+    pcl::demeanPointCloud<PointNormalT, float>(*src_pts, centroid, *src_pts);
     
     if (this->iter_counter_++ == 0) {
        pcl::copyPointCloud<PointNormalT, PointNormalT>(
           *mask_cloud, *model_points_);
        this->prev_trans_ = Eigen::Matrix4f::Identity();
     } else {
-
-       /*
        PointCloudNormal::Ptr align_points(new PointCloudNormal);
        Matrix4f transformation;
        bool is_ok = this->registrationICP(align_points, transformation,
-                                          model_points_, mask_cloud);
+                                          mask_cloud, mask_cloud);
+
+       
+       std::cout << transformation  << "\n";
+       
        /*
        if (is_ok) {
           // src_pts->clear();
@@ -247,9 +246,6 @@ void HandheldObjectRegistration::spatialClustering(
        max_point(2) = pt.z > max_point(2) ? pt.z : max_point(2);
     }
 
-    std::cout << min_point  << "\n";
-    std::cout << max_point  << "\n\n";
-
     temp_cloud->clear();
     for (int i = 0; i < in_cloud->size(); i++) {
        PointNormalT pt = in_cloud->points[i];
@@ -315,22 +311,12 @@ bool HandheldObjectRegistration::registrationICP(
        return false;
     }
 
-    this->icp_ = ICP::Ptr(new ICP);
-    this->icp_->setMaximumIterations(5);
-    this->icp_->setRANSACOutlierRejectionThreshold(0.06);
-    this->icp_->setRANSACIterations(500);
-    this->icp_->setTransformationEpsilon(1e-8);
-    // this->icp_->setUseReciprocalCorrespondences(true);
-     this->icp_->setMaxCorrespondenceDistance(0.05);
-
-    
     this->icp_->setInputSource(src_points);
     this->icp_->setInputTarget(target_points);
 
     ROS_WARN("SOLVING");
-
-    PointCloudNormal::Ptr align_points1(new PointCloudNormal);
-    this->icp_->align(*align_points1);
+    
+    this->icp_->align(*align_points);
 
     ROS_WARN("DONE");
     
