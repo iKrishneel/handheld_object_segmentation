@@ -40,8 +40,8 @@ class HandHheldObjectTracking():
         self.__templ_datum = None
 
         ###! temp
-        self.__weights = '/media/volume/programs/handheld/snapshot_iter_4905.caffemodel'
-        self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
+        #self.__weights = '/media/volume/programs/handheld/snapshot_iter_4905.caffemodel'
+        #self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
 
         if self.is_file_valid():
             self.load_caffe_model()
@@ -58,7 +58,19 @@ class HandHheldObjectTracking():
 
 
     def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
-        ##! normalize and encode
+        ##!crop (build multiple scale)
+        rect = self.get_region_bbox(im_rgb, rect, scale)
+        x,y,w,h = rect
+        im_rgb = im_rgb[y:y+h, x:x+w].copy()
+        im_dep = im_dep[y:y+h, x:x+w].copy()
+        
+        image = im_rgb.copy()
+
+        ##! resize to network input
+        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
+        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
+
+                ##! normalize and encode
         im_rgb = im_rgb.astype(np.float32)
         im_rgb /= im_rgb.max()
         im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
@@ -73,18 +85,6 @@ class HandHheldObjectTracking():
         im_dep = im_dep.astype(np.float32)
         im_dep /= im_dep.max()
         im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
-
-        ##!crop (build multiple scale)
-        rect = self.get_region_bbox(im_rgb, rect, scale)
-        x,y,w,h = rect
-        im_rgb = im_rgb[y:y+h, x:x+w].copy()
-        im_dep = im_dep[y:y+h, x:x+w].copy()
-        
-        image = im_rgb.copy()
-
-        ##! resize to network input
-        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
-        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
 
         
         #! transpose to c, h, w
