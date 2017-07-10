@@ -1,6 +1,6 @@
 <launch>
   <arg name="image" default="/camera/rgb/image_rect_color" />
-  <arg name="depth" default="/camera/depth_registered/hw_registered/image_rect_raw" />
+  <arg name="depth" default="/camera/depth_registered/image_raw" />
   <arg name="rect" default="$(arg image)/screenrectangle" />  
 
   <arg name="pretrained_weights" default="$(find handheld_object_segmentation)/train/snapshots/snapshot_iter_4905.caffemodel" />

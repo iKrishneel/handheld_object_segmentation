@@ -33,22 +33,24 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
-        self.__scales = np.array([1.250], dtype = np.float32)
+        self.__scales = np.array([1.750], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
-        self.__templ_datum = None
 
-        ###! temp
-        #self.__weights = '/media/volume/programs/handheld/snapshot_iter_4905.caffemodel'
-        #self.__model_proto = '/media/volume/programs/handheld/deploy.prototxt'
+        #! save previous data
+        self.__prev_roi = None
+        self.__prev_rgb = None
+        self.__prev_dep = None
 
         if self.is_file_valid():
             self.load_caffe_model()
             rospy.loginfo('TRACKER SETUP SUCCESSFUL')
 
         self.__im_datum = np.zeros((self.__batch_size, self.__channels, \
-                                    self.__im_height, self.__im_width), np.float32)        
+                                    self.__im_height, self.__im_width), np.float32)
+        self.__templ_datum = np.zeros((self.__batch_size, self.__channels, \
+                                       self.__im_height, self.__im_width), np.float32)
 
         self.__image_pub = rospy.Publisher('/probability_map', Image, queue_size = 1)
         self.__image_pub2 = rospy.Publisher('/region', Image, queue_size = 1)
@@ -56,21 +58,8 @@ class HandHheldObjectTracking():
 
         self.subscribe()
 
-
-    def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
-        ##!crop (build multiple scale)
-        rect = self.get_region_bbox(im_rgb, rect, scale)
-        x,y,w,h = rect
-        im_rgb = im_rgb[y:y+h, x:x+w].copy()
-        im_dep = im_dep[y:y+h, x:x+w].copy()
-        
-        image = im_rgb.copy()
-
-        ##! resize to network input
-        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
-        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
-
-                ##! normalize and encode
+    def normalize_data(self, im_rgb, im_dep):
+        ##! normalize and encode
         im_rgb = im_rgb.astype(np.float32)
         im_rgb /= im_rgb.max()
         im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
@@ -86,29 +75,79 @@ class HandHheldObjectTracking():
         im_dep /= im_dep.max()
         im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
 
+        return im_rgb, im_dep
+
+    def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
+        # ##! normalize and encode
+        # im_rgb = im_rgb.astype(np.float32)
+        # im_rgb /= im_rgb.max()
+        # im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
+        
+        # im_dep = im_dep.astype(np.float32) \
+        #          if not im_dep.dtype is str('float32') else  im_dep
+        # im_dep /= im_dep.max()
+        # im_dep *= 255.0
+        # im_dep = im_dep.astype(np.uint8)
+        # im_dep = cv.applyColorMap(im_dep, cv.COLORMAP_JET)
+
+        # im_dep = im_dep.astype(np.float32)
+        # im_dep /= im_dep.max()
+        # im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
+
+        # im_rgb, im_dep = self.normalize_data(im_rgb, im_dep)
+        
+        ##!crop (build multiple scale)
+        rect = self.get_region_bbox(im_rgb, rect, scale)
+        x,y,w,h = rect
+        im_rgb = im_rgb[y:y+h, x:x+w].copy()
+        im_dep = im_dep[y:y+h, x:x+w].copy()
+        
+        image = im_rgb.copy()
+
+        ##! resize to network input
+        im_rgb = cv.resize(im_rgb, (int(self.__im_width), int(self.__im_height)))
+        im_dep = cv.resize(im_dep, (int(self.__im_width), int(self.__im_height)))
         
         #! transpose to c, h, w
         im_rgb = im_rgb.transpose((2, 0, 1))
         im_dep = im_dep.transpose((2, 0, 1))
 
         return im_rgb, im_dep, image, rect
-        
 
+
+        
     def track(self, im_rgb, im_dep, header = None):
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
-        
+
+        im_dep[im_dep > 5] = 0.0  #! mask depth
+        im_nrgb, im_ndep = self.normalize_data(im_rgb, im_dep) #! normalize data
+
+        if self.__prev_dep is None or self.__prev_rgb is None or self.__prev_roi is None:
+            self.__prev_rgb = im_nrgb.copy()
+            self.__prev_dep = im_ndep.copy()
+            self.__prev_roi = self.__rect
+
         crop_rects = []
         for index, scale in enumerate(self.__scales):
-            in_rgb, in_dep, image, rect = self.process_rgbd(im_rgb, im_dep, \
+            in_rgb, in_dep, image, rect = self.process_rgbd(im_nrgb, im_ndep, \
                                                             self.__rect.copy(), scale)
             self.__im_datum[index][0:3, :, :] = in_rgb.copy()
             self.__im_datum[index][3:6, :, :] = in_dep.copy()
             crop_rects.append(rect)
+            
+            ##! template cropping
+            in_rgb, in_dep, image, prect = self.process_rgbd(self.__prev_rgb, self.__prev_dep, \
+                                                             self.__prev_roi.copy(), 1.25)
+            self.__templ_datum[index][0:3, :, :] = in_rgb.copy()
+            self.__templ_datum[index][3:6, :, :] = in_dep.copy()
+            
 
-        if self.__templ_datum is None:
-            self.__templ_datum = self.__im_datum.copy()
-            self.__scales[0] = 1.500
+            
+        # if self.__templ_datum is None:
+        #     # self.__prev_roi = 
+        #     self.__templ_datum = self.__im_datum.copy()
+        #     self.__scales[0] = 2.0
             
         self.__net.blobs['target_data'].data[...] = self.__im_datum.copy()
         self.__net.blobs['template_data'].data[...] = self.__templ_datum.copy()
@@ -116,13 +155,20 @@ class HandHheldObjectTracking():
         output = self.__net.forward()
 
         update_model = True
+        tmp_rect = self.__rect.copy()
         for index in xrange(0, self.__batch_size, 1):
             feat = self.__net.blobs['score'].data[index]
             prob = feat[1].copy()
-
+            
             prob *= 255
             prob = prob.astype(np.uint8)
             prob = cv.resize(prob, (rect[2], rect[3]))
+
+            ##!
+            im_prob = cv.applyColorMap(prob, cv.COLORMAP_JET)
+            cv.imshow('prob', im_prob)
+            cv.waitKey(3)
+            ##!
             
             kernel = np.ones((7, 7), np.uint8)
             prob = cv.erode(prob, kernel, iterations = 1)
@@ -133,10 +179,11 @@ class HandHheldObjectTracking():
             bbox = self.create_mask_rect(prob, rect)
             if bbox is None:
                 update_model = False
-                rospy.logerr('OBJECT REGION NOT FOUND')
+                #rospy.logerr('OBJECT REGION NOT FOUND')
                 #rospy.signal_shutdown('OBJECT SEEMS TO HAVE LOST')
                 #return
-                bbox = self.__rect
+                #bbox = self.__rect
+                return
             
             bbox = np.array(bbox, dtype=np.int)
             bbox[0] += rect[0]
@@ -156,9 +203,9 @@ class HandHheldObjectTracking():
             x,y,w,h = crop_rects[index]
             im_mask[y:y+h, x:x+w] = prob
 
-            area_ratio = float(bbox[2] * bbox[3]) / float(self.__rect[2] * self.__rect[3])
-            if area_ratio > 0.5 and area_ratio < 2 :
-                self.__rect = bbox.copy()
+            # area_ratio = float(bbox[2] * bbox[3]) / float(self.__rect[2] * self.__rect[3])
+            # if area_ratio > 0.5 and area_ratio < 2 :
+            self.__rect = bbox.copy()
             
             x, y, w, h = bbox
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(h+y)), (0, 255, 0), 4)
@@ -181,9 +228,13 @@ class HandHheldObjectTracking():
             rect_msg.polygon.points.append(pt)
             self.__rect_pub.publish(rect_msg)
             
+            #if update_model:
+            # self.__templ_datum = self.__im_datum.copy()
+                    ##! update previous
         if update_model:
-            self.__templ_datum = self.__im_datum.copy()
-
+            self.__prev_rgb = im_nrgb.copy()
+            self.__prev_dep = im_ndep.copy()
+            self.__prev_roi = tmp_rect
                 
     def create_mask_rect(self, im_gray, rect):  #! rect used for cropping
         if len(im_gray.shape) is None:
@@ -250,7 +301,6 @@ class HandHheldObjectTracking():
             return
             
         im_dep[np.isnan(im_dep)] = 0.0
-
 
         if not self.__rect is None:
             self.track(im_rgb, im_dep, image_msg.header)
