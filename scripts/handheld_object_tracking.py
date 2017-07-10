@@ -114,7 +114,6 @@ class HandHheldObjectTracking():
 
         return im_rgb, im_dep, image, rect
 
-
         
     def track(self, im_rgb, im_dep, header = None):
         caffe.set_device(self.__device_id)
@@ -138,11 +137,9 @@ class HandHheldObjectTracking():
             
             ##! template cropping
             in_rgb, in_dep, image, prect = self.process_rgbd(self.__prev_rgb, self.__prev_dep, \
-                                                             self.__prev_roi.copy(), 1.25)
+                                                             self.__prev_roi.copy(), scale)
             self.__templ_datum[index][0:3, :, :] = in_rgb.copy()
             self.__templ_datum[index][3:6, :, :] = in_dep.copy()
-            
-
             
         # if self.__templ_datum is None:
         #     # self.__prev_roi = 
@@ -385,12 +382,9 @@ class HandHheldObjectTracking():
     def subscribe(self):
         
         rospy.Subscriber('rect', Rect, self.screen_point_callback)
-
-
         image_sub = message_filters.Subscriber('image', Image)
         depth_sub = message_filters.Subscriber('depth', Image)
-
-        ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub], 10, 1)
+        ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub], 3, 1)
         ts.registerCallback(self.callback)
 
     """
