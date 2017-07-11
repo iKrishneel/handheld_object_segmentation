@@ -33,7 +33,7 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
-        self.__scales = np.array([1.25, 1.75, 2.25], dtype = np.float32)
+        self.__scales = np.array([1.250], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
@@ -78,24 +78,6 @@ class HandHheldObjectTracking():
         return im_rgb, im_dep
 
     def process_rgbd(self, im_rgb, im_dep, rect, scale = 1.5):
-        # ##! normalize and encode
-        # im_rgb = im_rgb.astype(np.float32)
-        # im_rgb /= im_rgb.max()
-        # im_rgb = (im_rgb - im_rgb.min())/(im_rgb.max() - im_rgb.min())
-        
-        # im_dep = im_dep.astype(np.float32) \
-        #          if not im_dep.dtype is str('float32') else  im_dep
-        # im_dep /= im_dep.max()
-        # im_dep *= 255.0
-        # im_dep = im_dep.astype(np.uint8)
-        # im_dep = cv.applyColorMap(im_dep, cv.COLORMAP_JET)
-
-        # im_dep = im_dep.astype(np.float32)
-        # im_dep /= im_dep.max()
-        # im_dep = (im_dep - im_dep.min())/(im_dep.max() - im_dep.min())
-
-        # im_rgb, im_dep = self.normalize_data(im_rgb, im_dep)
-        
         ##!crop (build multiple scale)
         rect = self.get_region_bbox(im_rgb, rect, scale)
         x,y,w,h = rect
@@ -141,7 +123,6 @@ class HandHheldObjectTracking():
             self.__templ_datum[index][0:3, :, :] = in_rgb.copy()
             self.__templ_datum[index][3:6, :, :] = in_dep.copy()
             
-            
         self.__net.blobs['target_data'].data[...] = self.__im_datum.copy()
         self.__net.blobs['template_data'].data[...] = self.__templ_datum.copy()
 
@@ -164,9 +145,11 @@ class HandHheldObjectTracking():
 
         for index, prob in enumerate(probability_map):
             ##!
-            im_prob = cv.applyColorMap(prob, cv.COLORMAP_JET)
-            cv.imshow('prob_' + str(index), im_prob)
-            cv.waitKey(20)
+            debug = False
+            if debug:
+                im_prob = cv.applyColorMap(prob, cv.COLORMAP_JET)
+                cv.imshow('prob_' + str(index), im_prob)
+                cv.waitKey(20)
             ##!
             
             kernel = np.ones((7, 7), np.uint8)
@@ -203,6 +186,15 @@ class HandHheldObjectTracking():
             x, y, w, h = bbox
             cv.rectangle(im_rgb, (int(x), int(y)), (int(x+w), int(h+y)), (0, 255, 0), 4)
 
+            #! test
+            kernel = np.ones((9, 9), np.uint8)
+            im_mask = cv.dilate(im_mask, kernel, iterations = 1)
+            # im_mask1 = cv.cvtColor(im_mask1, cv.COLOR_GRAY2BGR)
+            # cv.addWeighted(im_rgb, 0.5, im_mask1, 0.5, 0, im_rgb)
+            # cv.imshow("img", im_rgb)
+            # cv.waitKey(3)
+            #!
+            
             ##! reduce mask by scale
             prob_msg = self.__bridge.cv2_to_imgmsg(im_mask, "mono8")
             prob_msg.header = header
@@ -221,9 +213,6 @@ class HandHheldObjectTracking():
             rect_msg.polygon.points.append(pt)
             self.__rect_pub.publish(rect_msg)
             
-            #if update_model:
-            # self.__templ_datum = self.__im_datum.copy()
-                    ##! update previous
         if update_model:
             self.__prev_rgb = im_nrgb.copy()
             self.__prev_dep = im_ndep.copy()
@@ -265,7 +254,6 @@ class HandHheldObjectTracking():
             
         rect = cv.boundingRect(contour[index]) if index > -1 else None
         return rect
-
 
     def get_bbox(self, im_rgb, rect, pad = 8):
         x, y, w, h = rect
