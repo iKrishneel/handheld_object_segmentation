@@ -33,7 +33,7 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
-        self.__scales = np.array([1.750], dtype = np.float32)
+        self.__scales = np.array([1.25, 1.75, 2.25], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
@@ -141,10 +141,6 @@ class HandHheldObjectTracking():
             self.__templ_datum[index][0:3, :, :] = in_rgb.copy()
             self.__templ_datum[index][3:6, :, :] = in_dep.copy()
             
-        # if self.__templ_datum is None:
-        #     # self.__prev_roi = 
-        #     self.__templ_datum = self.__im_datum.copy()
-        #     self.__scales[0] = 2.0
             
         self.__net.blobs['target_data'].data[...] = self.__im_datum.copy()
         self.__net.blobs['template_data'].data[...] = self.__templ_datum.copy()
@@ -153,18 +149,24 @@ class HandHheldObjectTracking():
 
         update_model = True
         tmp_rect = self.__rect.copy()
+
+        probability_map = []
+        
         for index in xrange(0, self.__batch_size, 1):
             feat = self.__net.blobs['score'].data[index]
             prob = feat[1].copy()
-            
             prob *= 255
             prob = prob.astype(np.uint8)
+            
+            rect = crop_rects[index]
             prob = cv.resize(prob, (rect[2], rect[3]))
+            probability_map.append(prob)
 
+        for index, prob in enumerate(probability_map):
             ##!
             im_prob = cv.applyColorMap(prob, cv.COLORMAP_JET)
-            cv.imshow('prob', im_prob)
-            cv.waitKey(3)
+            cv.imshow('prob_' + str(index), im_prob)
+            cv.waitKey(20)
             ##!
             
             kernel = np.ones((7, 7), np.uint8)
@@ -173,6 +175,7 @@ class HandHheldObjectTracking():
             prob = cv.GaussianBlur(prob, (5, 5), 0)
             _, prob = cv.threshold(prob, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
+            rect = crop_rects[index]
             bbox = self.create_mask_rect(prob, rect)
             if bbox is None:
                 update_model = False
@@ -188,13 +191,6 @@ class HandHheldObjectTracking():
 
             #! enlarge by padding
             bbox = self.get_bbox(im_rgb, bbox, 10)
-
-            ##! crop prob to rect size
-            # x = int(bbox[0] - crop_rects[index][0])
-            # y = int(bbox[1] - crop_rects[index][1])
-            # w = int(bbox[2])
-            # h = int(bbox[3])
-            #prob = prob[y:y+h, x:x+w]
 
             im_mask = np.zeros((im_rgb.shape[0], im_rgb.shape[1]), dtype = np.uint8)
             x,y,w,h = crop_rects[index]
