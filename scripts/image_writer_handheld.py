@@ -2,6 +2,7 @@
 
 import sys
 import os
+import shutil
 import rospy
 import rosbag
 import message_filters
@@ -11,12 +12,28 @@ import numpy as np
 import cv2 as cv
 from cv_bridge import CvBridge
 
-class ImageRectWriter:
+class ImageRectWriter(object):
     def __init__(self):
         self.__write_path = '/home/krishneel/Documents/datasets/handheld_objects2/'
         self.__text_filename = 'train.txt'
-        self.__obj_name = 'kleenx/'
-        self.__label = 3
+
+        #! check the folder
+        self.remove_empty_folders()
+
+        #! auto label
+        self.__label = len(os.walk(str(self.__write_path)).next()[1]) + 1
+        rospy.loginfo('\033[34mLabel %s \033[0m', str(self.__label))
+
+        numeric_label = rospy.get_param('~numeric_label', True)
+        if numeric_label:
+            self.__obj_name = str(self.__label).zfill(8) + '/'
+        else:
+            self.__obj_name = rospy.get_param('~object_name', None)
+
+        if self.__obj_name is None:
+            rospy.logfatal('provide object name')
+            sys.exit(1)
+
         self.__bridge = CvBridge()
         self.__counter = 0
 
@@ -34,6 +51,21 @@ class ImageRectWriter:
             os.makedirs(str(self.__mask_path))
             
         self.subscribe()
+
+    
+    def remove_empty_folders(self):
+        [
+            shutil.rmtree(self.__write_path + fn)
+            for fn in os.listdir(str(self.__write_path))
+            if not os.path.isfile(self.__write_path + fn + '/' + self.__text_filename)
+            if os.path.isdir(self.__write_path + fn)
+        ]
+
+        # for fn in os.listdir(str(self.__write_path)):
+        #     if os.path.isdir(self.__write_path + fn):
+        #         if not os.path.isfile(self.__write_path + fn + '/' + self.__text_filename):
+        #             shutil.rmtree(self.__write_path + fn)
+                    
 
     def callback(self, image_msg, mask_msg):
         cv_img = self.convert_image(image_msg)
