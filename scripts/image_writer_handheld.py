@@ -15,8 +15,8 @@ class ImageRectWriter:
     def __init__(self):
         self.__write_path = '/home/krishneel/Documents/datasets/handheld_objects2/'
         self.__text_filename = 'train.txt'
-        self.__obj_name = 'mask/'
-        self.__label = 16
+        self.__obj_name = 'kleenx/'
+        self.__label = 3
         self.__bridge = CvBridge()
         self.__counter = 0
 

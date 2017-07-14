@@ -162,10 +162,6 @@ class HandHheldObjectTracking():
             bbox = self.create_mask_rect(prob, rect)
             if bbox is None:
                 update_model = False
-                #rospy.logerr('OBJECT REGION NOT FOUND')
-                #rospy.signal_shutdown('OBJECT SEEMS TO HAVE LOST')
-                #return
-                #bbox = self.__rect
                 return
             
             bbox = np.array(bbox, dtype=np.int)
@@ -189,11 +185,17 @@ class HandHheldObjectTracking():
             #! test
             kernel = np.ones((9, 9), np.uint8)
             im_mask = cv.dilate(im_mask, kernel, iterations = 1)
+
             # im_mask1 = cv.cvtColor(im_mask1, cv.COLOR_GRAY2BGR)
             # cv.addWeighted(im_rgb, 0.5, im_mask1, 0.5, 0, im_rgb)
             # cv.imshow("img", im_rgb)
             # cv.waitKey(3)
             #!
+            
+            ##! remove incorrect mask by depth masking
+            im_mask2 = np.zeros(im_mask.shape, np.uint8)
+            im_mask2[y:y+h, x:x+w] = im_mask[y:y+h, x:x+w]
+            im_mask = self.depth_mask_filter(im_dep, im_mask2)
             
             ##! reduce mask by scale
             prob_msg = self.__bridge.cv2_to_imgmsg(im_mask, "mono8")
@@ -217,6 +219,11 @@ class HandHheldObjectTracking():
             self.__prev_rgb = im_nrgb.copy()
             self.__prev_dep = im_ndep.copy()
             self.__prev_roi = tmp_rect
+
+
+    def depth_mask_filter(self, im_dep, im_mask, max_dist = 1.5):
+        im_mask[im_dep > max_dist] = 0
+        return im_mask
                 
     def create_mask_rect(self, im_gray, rect):  #! rect used for cropping
         if len(im_gray.shape) is None:
