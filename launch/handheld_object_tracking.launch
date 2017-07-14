@@ -3,7 +3,7 @@
   <arg name="depth" default="/camera/depth_registered/image_raw" />
   <arg name="rect" default="$(arg image)/screenrectangle" />  
 
-  <arg name="pretrained_weights" default="$(find handheld_object_segmentation)/train/snapshots/snapshot_iter_4905.caffemodel" />
+  <arg name="pretrained_weights" default="$(find handheld_object_segmentation)/train/snapshots/snapshot_iter_7208.caffemodel" />
   <arg name="deployment_prototxt" default="$(find handheld_object_segmentation)/train/deploy.prototxt" />
   
  <node pkg="handheld_object_segmentation" type="handheld_object_tracking.py"

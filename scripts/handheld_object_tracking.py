@@ -33,7 +33,7 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
-        self.__scales = np.array([1.250], dtype = np.float32)
+        self.__scales = np.array([2.0], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
@@ -368,7 +368,7 @@ class HandHheldObjectTracking():
         rospy.Subscriber('rect', Rect, self.screen_point_callback)
         image_sub = message_filters.Subscriber('image', Image)
         depth_sub = message_filters.Subscriber('depth', Image)
-        ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub], 3, 1)
+        ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub], 2, 1)
         ts.registerCallback(self.callback)
 
     """
