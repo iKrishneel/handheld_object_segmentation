@@ -14,7 +14,7 @@ from cv_bridge import CvBridge
 
 class ImageRectWriter(object):
     def __init__(self):
-        self.__write_path = '/home/krishneel/Documents/datasets/handheld_objects2/'
+        self.__write_path = '/home/krishneel/Documents/datasets/handheld_objects/'
         self.__text_filename = 'train.txt'
 
         #! check the folder
@@ -26,7 +26,7 @@ class ImageRectWriter(object):
 
         numeric_label = rospy.get_param('~numeric_label', True)
         if numeric_label:
-            self.__obj_name = str(self.__label).zfill(8) + '/'
+            self.__obj_name = str(self.__label).zfill(3) + '/'
         else:
             self.__obj_name = rospy.get_param('~object_name', None)
 
@@ -117,7 +117,7 @@ class ImageRectWriter(object):
         #! convert mask to label
         mask_img[mask_img > 0] = self.__label
 
-        if self.__counter < 500:
+        if self.__counter < 1000:
             text_file = open(str(self.__write_path + self.__obj_name + self.__text_filename), "a")
         
             im_p =  self.__img_path + str(self.__counter).zfill(8) + '.jpg'

@@ -33,7 +33,7 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
-        self.__scales = np.array([2.0], dtype = np.float32)
+        self.__scales = np.array([1.250], dtype = np.float32)
 
         self.__rect = None
         self.__batch_size = int(self.__scales.shape[0])
