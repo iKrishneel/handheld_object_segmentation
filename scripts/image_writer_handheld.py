@@ -15,7 +15,7 @@ from cv_bridge import CvBridge
 
 class ImageRectWriter(object):
     def __init__(self):
-        self.__write_path = '/home/krishneel/Documents/datasets/hsr/'
+        self.__write_path = '/media/volume/Documents/datasets/hsr/'
         self.__text_filename = 'train.txt'
         self.__frame_write = 1000
 
@@ -35,7 +35,7 @@ class ImageRectWriter(object):
 
 
         ## hardcore
-        self.__obj_name = "tea"
+        self.__obj_name = "tea/"
             
         if self.__obj_name is None:
             rospy.logfatal('provide object name')
@@ -149,7 +149,7 @@ class ImageRectWriter(object):
     """
     def json_encoding(self, rect, image_fn, mask_fn):
         size = (float(rect[2]), float(rect[3]))
-        cx, cy = (rect[0] + rect[2]/2.0, rect[1] + rect[3]/2.0f)
+        cx, cy = (rect[0] + rect[2]/2.0, rect[1] + rect[3]/2.0)
         label = {}
         anno = {}
         anno['size'] = {'x' : size[0], 'y' : size[1]}
