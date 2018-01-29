@@ -18,9 +18,11 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point32
 from geometry_msgs.msg import PolygonStamped as Rect
 
+from image_writer_handheld import ImageRectWriter
+
 (CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
 
-class HandHheldObjectTracking():
+class HandHheldObjectTracking(ImageRectWriter):
     def __init__(self):
         self.__net = None
         self.__transformer = None
@@ -56,6 +58,9 @@ class HandHheldObjectTracking():
         self.__image_pub2 = rospy.Publisher('/region', Image, queue_size = 1)
         self.__rect_pub = rospy.Publisher('/object_rect', Rect, queue_size = 1)
 
+        ImageRectWriter.__init__(self)
+        
+        
         self.subscribe()
 
     def normalize_data(self, im_rgb, im_dep):
@@ -102,6 +107,8 @@ class HandHheldObjectTracking():
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
 
+        im_copy = im_rgb.copy()
+        
         dist_mask_thresh = 4
         dist_mask_thresh *= 1000.0 if im_dep.max() > 1000.00 else 1.0
         
@@ -200,6 +207,11 @@ class HandHheldObjectTracking():
             im_mask2 = np.zeros(im_mask.shape, np.uint8)
             im_mask2[y:y+h, x:x+w] = im_mask[y:y+h, x:x+w]
             im_mask = self.depth_mask_filter(im_dep, im_mask2)
+
+
+            ##! write data to file
+            self.write_annotated_data(im_copy, im_mask, bbox)
+
             
             ##! reduce mask by scale
             prob_msg = self.__bridge.cv2_to_imgmsg(im_mask, "mono8")
