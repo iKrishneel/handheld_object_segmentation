@@ -66,6 +66,7 @@ class HandHheldObjectTracking():
         
         im_dep = im_dep.astype(np.float32) \
                  if not im_dep.dtype is str('float32') else  im_dep
+        
         im_dep /= im_dep.max()
         im_dep *= 255.0
         im_dep = im_dep.astype(np.uint8)
@@ -101,7 +102,10 @@ class HandHheldObjectTracking():
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
 
-        im_dep[im_dep > 5] = 0.0  #! mask depth
+        dist_mask_thresh = 4
+        dist_mask_thresh *= 1000.0 if im_dep.max() > 1000.00 else 1.0
+        
+        im_dep[im_dep > dist_mask_thresh] = 0.0  #! mask depth
         im_nrgb, im_ndep = self.normalize_data(im_rgb, im_dep) #! normalize data
 
         if self.__prev_dep is None or self.__prev_rgb is None or self.__prev_roi is None:
