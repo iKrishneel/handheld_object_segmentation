@@ -1,0 +1,22 @@
+layer {
+  type: 'Python'
+  name: 'Argumentation'
+  top: "template_data"	
+  top: "target_data"
+  top: "labels"
+  top: "label"
+  python_param {
+    module: 'data_argumentation_layer'
+    layer: 'DataArgumentationLayer'
+    param_str: "{\'batch_size\': 20, \'im_width\': 227, \'im_height\': 227, \'filename\': '/home/krishneel/Documents/datasets/handheld_objects/train.txt', \'directory\': '/home/krishneel/Documents/datasets/handheld_objects/' }"
+    }
+}
+
+layer {
+  name: "silence_layer"
+  type: "Silence"
+  bottom: "template_data"
+  bottom: "target_data"
+  bottom: "labels"
+  bottom: "label"
+}
