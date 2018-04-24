@@ -5,7 +5,7 @@ average_loss: 20
 lr_policy: "fixed"
 momentum: 0.9
 iter_size: 20
-max_iter: 100000
+max_iter: 10
 weight_decay: 0.0005
 snapshot: 4000
 snapshot_prefix: "snapshots/snapshot"
