@@ -89,8 +89,8 @@ class DataArgumentationLayer(caffe.Layer):
             im_srgb, im_sdep, im_smask = self.read_images(**src_data)
 
             while True:
-                templ_datum, _ = self.__ae.process2(im_trgb, im_tdep, im_tmask, True)
-                if not templ_datum is None:
+                template_datum, _ = self.__ae.process2(im_trgb, im_tdep, im_tmask, True)
+                if not template_datum is None:
                     break
                 else:
                     t_key, t_rnd, _, _ = self.fetch_data_once()
@@ -98,16 +98,18 @@ class DataArgumentationLayer(caffe.Layer):
                     im_trgb, im_tdep, im_tmask = self.read_images(**templ_data)
             
             while True:
-                src_datum, mask_datum = self.__ae.process2(im_srgb, im_sdep, im_smask, False)
-                if not src_datum is None:
+                target_datum, label_datum = self.__ae.process2(im_srgb, im_sdep, im_smask, False)
+                if not target_datum is None:
                     break
                 else:
-                    _, _, s_key, s_rnd = fetch_data_once()
+                    _, _, s_key, s_rnd = self.fetch_data_once()
                     src_data = self.__dataset[s_key][s_rnd]
                     im_srgb, im_sdep, im_smask = self.read_images(**src_data)
 
             label = 1.0 if t_key == s_key else 0.0
-                    
+
+            print "labels: ", label
+            
             top[0].data[index] = template_datum.copy()
             top[1].data[index] = target_datum.copy()
             top[2].data[index] = label_datum.copy()
@@ -160,7 +162,7 @@ class DataArgumentationLayer(caffe.Layer):
 
     def read_data_from_textfile2(self):
         train_fn = 'train.txt'
-        self.__objects = read_textfile(os.path.join(self.directory, 'objects.txt'))
+        self.__objects = self.read_textfile(os.path.join(self.directory, 'objects.txt'))
 
         self.__dataset = {}
 
@@ -168,7 +170,7 @@ class DataArgumentationLayer(caffe.Layer):
             fn = os.path.join(self.directory, os.path.join(obj, train_fn))
             if not os.path.isfile(fn):
                 raise Exception('Missing data train.txt')
-            lines = read_textfile(fn)
+            lines = self.read_textfile(fn)
             datas = []
             for index, line in enumerate(lines):
                 if index % 3 == 0:

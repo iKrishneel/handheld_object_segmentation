@@ -133,7 +133,7 @@ class ArgumentationEngine(object):
         z = np.hstack((rgb1, dep1))
         cv.namedWindow('img', cv.WINDOW_NORMAL)
         cv.imshow('img', z)
-        cv.waitKey(0)
+        cv.waitKey(3 )
         ##################################
         
         return (target_datum, mask_datum)        
@@ -262,116 +262,116 @@ class ArgumentationEngine(object):
 
 
 
-direct = '/home/krishneel/Documents/datasets/handheld_objects/'
-# im_rgb = cv.imread(direct + 'image/00000000.jpg')
-# im_dep = cv.imread(direct + 'depth/00000000.jpg')
-# im_mask = cv.imread(direct + 'mask/00000000.jpg')
+# direct = '/home/krishneel/Documents/datasets/handheld_objects/'
+# # im_rgb = cv.imread(direct + 'image/00000000.jpg')
+# # im_dep = cv.imread(direct + 'depth/00000000.jpg')
+# # im_mask = cv.imread(direct + 'mask/00000000.jpg')
 
-# print im_rgb.shape, im_dep.shape, im_mask.shape
+# # print im_rgb.shape, im_dep.shape, im_mask.shape
+
+# # ae = ArgumentationEngine(227, 227)
+# # ae.process2(im_rgb, im_dep, im_mask)
+
+# import os
+
+# def read_textfile(filename):
+#     lines = [line.rstrip('\n')                                                                                              
+#              for line in open(filename)                                                                             
+#     ]
+#     return np.array(lines)
+
+
+# def read_images(**kwargs):
+#     im_rgb = cv.imread(kwargs['image'], cv.IMREAD_COLOR)
+#     im_dep = cv.imread(kwargs['depth'], cv.IMREAD_ANYCOLOR)
+#     im_mask = cv.imread(kwargs['mask'], cv.IMREAD_COLOR)
+#     return im_rgb, im_dep, im_mask
+
+# train_fn = 'train.txt'
+# objects = read_textfile(os.path.join(direct, 'objects.txt'))
+
+# dataset = {}
+
+# for obj in objects:    
+#     fn = os.path.join(direct, os.path.join(obj, train_fn))
+#     if not os.path.isfile(fn):
+#         raise Exception('Missing dataset train.txt')
+    
+#     lines = read_textfile(fn)
+
+#     datas = []
+#     for index, line in enumerate(lines):
+#         if index % 3 == 0:
+#             datas.append({
+#                 'image': lines[index].split()[0],
+#                 'depth' : lines[index+1].split()[0],
+#                 'mask' :lines[index+2].split()[0]
+#             })
+
+#     dataset[str(obj)] = np.array(datas)
+
+
+# def fetch_data_once():
+#     t_rnd = random.randint(0, objects.shape[0] - 1)
+#     s_rnd = random.randint(0, objects.shape[0] - 1)
+
+#     label = 1 if t_rnd is s_rnd else 0
+    
+#     t_key = objects[t_rnd]
+#     s_key = objects[s_rnd]
+
+#     t_rnd = random.randint(0, (dataset[t_key].shape[0]) - 1)
+#     s_rnd = t_rnd
+    
+#     if label:
+#         s_rnd = t_rnd + 1 if t_rnd is 0 else t_rnd - 1
+#     else:
+#         s_rnd = random.randint(0, (dataset[s_key].shape[0]) - 1)
+
+#     return (t_key, t_rnd, s_key, s_rnd)
+    
 
 # ae = ArgumentationEngine(227, 227)
-# ae.process2(im_rgb, im_dep, im_mask)
 
-import os
+# for i in xrange(0, 100, 1):
+#     """
+#     t_rnd = random.randint(0, objects.shape[0] - 1)
+#     s_rnd = random.randint(0, objects.shape[0] - 1)
 
-def read_textfile(filename):
-    lines = [line.rstrip('\n')                                                                                              
-             for line in open(filename)                                                                             
-    ]
-    return np.array(lines)
-
-
-def read_images(**kwargs):
-    im_rgb = cv.imread(kwargs['image'], cv.IMREAD_COLOR)
-    im_dep = cv.imread(kwargs['depth'], cv.IMREAD_ANYCOLOR)
-    im_mask = cv.imread(kwargs['mask'], cv.IMREAD_COLOR)
-    return im_rgb, im_dep, im_mask
-
-train_fn = 'train.txt'
-objects = read_textfile(os.path.join(direct, 'objects.txt'))
-
-dataset = {}
-
-for obj in objects:    
-    fn = os.path.join(direct, os.path.join(obj, train_fn))
-    if not os.path.isfile(fn):
-        raise Exception('Missing dataset train.txt')
+#     label = 1 if t_rnd is s_rnd else 0
     
-    lines = read_textfile(fn)
+#     t_key = objects[t_rnd]
+#     s_key = objects[s_rnd]
 
-    datas = []
-    for index, line in enumerate(lines):
-        if index % 3 == 0:
-            datas.append({
-                'image': lines[index].split()[0],
-                'depth' : lines[index+1].split()[0],
-                'mask' :lines[index+2].split()[0]
-            })
-
-    dataset[str(obj)] = np.array(datas)
-
-
-def fetch_data_once():
-    t_rnd = random.randint(0, objects.shape[0] - 1)
-    s_rnd = random.randint(0, objects.shape[0] - 1)
-
-    label = 1 if t_rnd is s_rnd else 0
+#     t_rnd = random.randint(0, (dataset[t_key].shape[0]) - 1)
+#     s_rnd = t_rnd
     
-    t_key = objects[t_rnd]
-    s_key = objects[s_rnd]
-
-    t_rnd = random.randint(0, (dataset[t_key].shape[0]) - 1)
-    s_rnd = t_rnd
-    
-    if label:
-        s_rnd = t_rnd + 1 if t_rnd is 0 else t_rnd - 1
-    else:
-        s_rnd = random.randint(0, (dataset[s_key].shape[0]) - 1)
-
-    return (t_key, t_rnd, s_key, s_rnd)
-    
-
-ae = ArgumentationEngine(227, 227)
-
-for i in xrange(0, 100, 1):
-    """
-    t_rnd = random.randint(0, objects.shape[0] - 1)
-    s_rnd = random.randint(0, objects.shape[0] - 1)
-
-    label = 1 if t_rnd is s_rnd else 0
-    
-    t_key = objects[t_rnd]
-    s_key = objects[s_rnd]
-
-    t_rnd = random.randint(0, (dataset[t_key].shape[0]) - 1)
-    s_rnd = t_rnd
-    
-    if label:
-        s_rnd = t_rnd + 1 if t_rnd is 0 else t_rnd - 1
-    else:
-        s_rnd = random.randint(0, (dataset[s_key].shape[0]) - 1)
-    """
+#     if label:
+#         s_rnd = t_rnd + 1 if t_rnd is 0 else t_rnd - 1
+#     else:
+#         s_rnd = random.randint(0, (dataset[s_key].shape[0]) - 1)
+#     """
 
 
     
-    t_key, t_rnd, s_key, s_rnd = fetch_data_once()
+#     t_key, t_rnd, s_key, s_rnd = fetch_data_once()
     
-    templ_data = dataset[t_key][t_rnd]
-    src_data = dataset[s_key][s_rnd]
+#     templ_data = dataset[t_key][t_rnd]
+#     src_data = dataset[s_key][s_rnd]
 
-    im_trgb, im_tdep, im_tmask = read_images(**templ_data)
-    im_srgb, im_sdep, im_smask = read_images(**src_data)
+#     im_trgb, im_tdep, im_tmask = read_images(**templ_data)
+#     im_srgb, im_sdep, im_smask = read_images(**src_data)
 
-    # ae.process2(im_trgb, im_tdep, im_tmask)
+#     # ae.process2(im_trgb, im_tdep, im_tmask)
 
-    while True:
-        src_datum, mask_datum = ae.process2(im_srgb, im_sdep, im_smask, False)
-        if not src_datum is None:
-            break
-        else:
-            print "None Detected"
-            _, _, s_key, s_rnd = fetch_data_once()
-            src_data = dataset[s_key][s_rnd]
-            im_srgb, im_sdep, im_smask = read_images(**src_data)
+#     while True:
+#         src_datum, mask_datum = ae.process2(im_srgb, im_sdep, im_smask, False)
+#         if not src_datum is None:
+#             break
+#         else:
+#             print "None Detected"
+#             _, _, s_key, s_rnd = fetch_data_once()
+#             src_data = dataset[s_key][s_rnd]
+#             im_srgb, im_sdep, im_smask = read_images(**src_data)
         
-    print "DONE:", src_datum.shape
+#     print "DONE:", src_datum.shape
