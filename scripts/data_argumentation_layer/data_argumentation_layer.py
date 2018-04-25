@@ -94,7 +94,7 @@ class DataArgumentationLayer(caffe.Layer):
                     break
                 else:
                     t_key, t_rnd, _, _ = self.fetch_data_once()
-                    templ_data = self.__dataset[s_key][s_rnd]
+                    templ_data = self.__dataset[t_key][t_rnd]
                     im_trgb, im_tdep, im_tmask = self.read_images(**templ_data)
             
             while True:
@@ -108,8 +108,6 @@ class DataArgumentationLayer(caffe.Layer):
 
             label = 1.0 if t_key == s_key else 0.0
 
-            print "labels: ", label
-            
             top[0].data[index] = template_datum.copy()
             top[1].data[index] = target_datum.copy()
             top[2].data[index] = label_datum.copy()

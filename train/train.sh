@@ -19,4 +19,5 @@ fname=$(date "+%Y-%m-%d-%H.%M-%S")
 
 $CAFFE_ROOT/build/tools/caffe train --solver=solver.prototxt \
     --gpu=0 \
+    --weights=$dir/snapshot_iter_7208.caffemodel \
     2>&1 | tee -a $pkg/handheld_object_$fname.log

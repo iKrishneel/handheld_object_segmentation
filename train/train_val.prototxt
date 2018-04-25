@@ -8,7 +8,7 @@ layer {
   python_param {
     module: 'data_argumentation_layer'
     layer: 'DataArgumentationLayer'
-    param_str: "{\'batch_size\': 2, \'im_width\': 227, \'im_height\': 227, \'filename\': '/home/krishneel/Documents/datasets/handheld_objects/train.txt', \'directory\': '/home/krishneel/Documents/datasets/handheld_objects/' }"
+    param_str: "{\'batch_size\': 64, \'im_width\': 227, \'im_height\': 227, \'filename\': '/home/krishneel/Documents/datasets/handheld_objects/train.txt', \'directory\': '/home/krishneel/Documents/datasets/handheld_objects/' }"
     }
 }
 
@@ -22,11 +22,11 @@ layer {
   top: "conv1"
   param {
      name: "conv1_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv1_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 96
@@ -77,11 +77,11 @@ layer {
   top: "conv2"
   param {
      name: "conv2_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv2_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 256
@@ -133,11 +133,11 @@ layer {
   top: "conv3"
   param {
      name: "conv3_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv3_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 384
@@ -166,11 +166,11 @@ layer {
   top: "conv4"
   param {
      name: "conv4_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv4_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 384
@@ -200,11 +200,11 @@ layer {
   top: "conv5"
   param {
      name: "conv5_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv5_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 256
@@ -237,11 +237,11 @@ layer {
   top: "conv1_p"
   param {
        name: "conv1_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv1_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 96
@@ -292,11 +292,11 @@ layer {
   top: "conv2_p"
   param {
      name: "conv2_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv2_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 256
@@ -348,11 +348,11 @@ layer {
   top: "conv3_p"
   param {
      name: "conv3_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv3_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 384
@@ -381,11 +381,11 @@ layer {
   top: "conv4_p"
   param {
      name: "conv4_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv4_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 384
@@ -415,11 +415,11 @@ layer {
   top: "conv5_p"
   param {
      name: "conv5_w"
-     lr_mult: 1.0
+     lr_mult: 0.0
   }
   param {
     name: "conv5_b"
-    lr_mult: 2.0
+    lr_mult: 0.0
   }
   convolution_param {
     num_output: 256
@@ -470,15 +470,15 @@ layer {
   bottom: "dropout5"
   top: "score_fr"
   param {
-      lr_mult: 1.0
+    lr_mult: 0.0
     decay_mult: 1.0
   }
   param {
-    lr_mult: 2.0
+    lr_mult: 0.0
     decay_mult: 0.0
   }
   convolution_param {
-    num_output: 1
+    num_output: 2
     pad: 0
     kernel_size: 1
     stride: 1
@@ -498,10 +498,10 @@ layer {
   bottom: "score_fr"
   top: "upscore"
   param {
-      lr_mult: 1.0
+      lr_mult: 0.0
   }
   convolution_param {
-    num_output: 1
+    num_output: 2
     bias_term: false
     kernel_size: 35
     stride: 16
@@ -554,17 +554,23 @@ layer {
   }
 }
 layer {
+  name: "relu5"
+  type: "ReLU"
+  bottom: "score_conv"
+  top: "score_conv"
+}
+layer {
   name: "score_fc1"
   type: "InnerProduct"
   bottom: "score_conv"
   top: "score_fc1"
   param {
-    lr_mult: 1
-    decay_mult: 1
+    lr_mult: 1.0
+    decay_mult: 1.0
   }
   param {
     lr_mult: 2
-    decay_mult: 0
+    decay_mult: 0.0
   }
   inner_product_param {
     num_output: 512
@@ -579,17 +585,32 @@ layer {
   }
 }
 layer {
+  name: "relu6"
+  type: "ReLU"
+  bottom: "score_fc1"
+  top: "score_fc1"
+}
+layer {
+  name: "dropout6"
+  type: "Dropout"
+  bottom: "score_fc1"
+  top: "dropout6"
+  dropout_param {
+      dropout_ratio: 0.5
+  }
+}
+layer {
   name: "score_fc2"
   type: "InnerProduct"
-  bottom: "score_fc1"
+  bottom: "dropout6"
   top: "score_fc2"
   param {
-    lr_mult: 1
-    decay_mult: 1
+    lr_mult: 1.0
+    decay_mult: 1.0
   }
   param {
-    lr_mult: 2
-    decay_mult: 0
+    lr_mult: 2.0
+    decay_mult: 0.0
   }
   inner_product_param {
     num_output: 1024
@@ -603,18 +624,35 @@ layer {
     }
   }
 }
+
+layer {
+  name: "relu7"
+  type: "ReLU"
+  bottom: "score_fc2"
+  top: "score_fc2"
+}
+layer {
+  name: "dropout7"
+  type: "Dropout"
+  bottom: "score_fc2"
+  top: "dropout7"
+  dropout_param {
+      dropout_ratio: 0.5
+  }
+}
+
 layer {
   name: "score_fc3"
   type: "InnerProduct"
-  bottom: "score_fc2"
+  bottom: "dropout7"
   top: "score_fc3"
   param {
-    lr_mult: 1
-    decay_mult: 1
+    lr_mult: 1.0
+    decay_mult: 1.0
   }
   param {
-    lr_mult: 2
-    decay_mult: 0
+    lr_mult: 2.0
+    decay_mult: 0.0
   }
   inner_product_param {
     num_output: 1

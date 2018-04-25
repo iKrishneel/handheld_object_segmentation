@@ -130,10 +130,10 @@ class ArgumentationEngine(object):
         # mask1 = mask_datum[0].copy()
         # mask1 = mask1.swapaxes(0, 1)
         
-        z = np.hstack((rgb1, dep1))
-        cv.namedWindow('img', cv.WINDOW_NORMAL)
-        cv.imshow('img', z)
-        cv.waitKey(3 )
+        # z = np.hstack((rgb1, dep1))
+        # cv.namedWindow('img', cv.WINDOW_NORMAL)
+        # cv.imshow('img', z)
+        # cv.waitKey(3 )
         ##################################
         
         return (target_datum, mask_datum)        
@@ -165,12 +165,6 @@ class ArgumentationEngine(object):
 
         if is_norm_dep:
             dep /= dep.max()
-
-
-        # cv.namedWindow('depth', cv.WINDOW_NORMAL)
-        # cv.imshow('depth', dep)
-        # cv.waitKey(0)
-        
         
         #! resize of network input
         rgb = cv.resize(rgb, (self.__in_size))
