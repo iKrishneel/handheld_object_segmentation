@@ -227,6 +227,8 @@ class HandHheldObjectTracking(ImageAnnotationWriter):
             im_mask = cv.cvtColor(im_mask, cv.COLOR_GRAY2BGR)
             z = np.hstack((im_rgb, im_mask))
             cv.imshow('image', z)
+            if cv.waitKey(3) == 27:
+                break
                 
             ##! reduce mask by scale
             """

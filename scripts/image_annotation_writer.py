@@ -8,7 +8,7 @@ import numpy as np
 import cv2 as cv
 
 class ImageAnnotationWriter(object):
-    def __init__(self, write_dir, num_frames_write = 20, numeric_label = None):
+    def __init__(self, write_dir, num_frames_write = 500, numeric_label = None):
 
         if not os.path.isdir(write_dir):
             print ('write_dir is not a valid directory %s' %write_dir)
@@ -99,6 +99,7 @@ class ImageAnnotationWriter(object):
                 dp_p =  os.path.join(self.__dep_path, str(self.__counter).zfill(8) + '.jpg')
                 cv.imwrite(dp_p, depth_img)
 
+            self.__write_path += os.sep if self.__write_path[-1] != os.sep else ""
             im_p = im_p.replace(self.__write_path, '')
             mk_p = mk_p.replace(self.__write_path, '')
             dp_p = dp_p.replace(self.__write_path, '')
@@ -128,7 +129,6 @@ class ImageAnnotationWriter(object):
             self.__counter += 1
         else:
             print ("Required number of frames written. Writing stopped...")
-            
-            # sys.exit()
+            sys.exit()
         
 
