@@ -3,6 +3,9 @@
   <arg name="depth" default="/camera/depth_registered/image_raw" />
   <arg name="rect" default="$(arg image)/screenrectangle" />  
 
+  <arg name="write_anno" default="False" />
+  <arg name="write_directory" default=""/>
+  
   <arg name="pretrained_weights" default="$(find handheld_object_segmentation)/train/snapshots/snapshot_iter_7208.caffemodel" />
   <arg name="deployment_prototxt" default="$(find handheld_object_segmentation)/train/deploy.prototxt" />
   
@@ -14,7 +17,8 @@
 
    <param name="pretrained_weights" value="$(arg pretrained_weights)" />
    <param name="deployment_prototxt" value="$(arg deployment_prototxt)" />
+
+   <param name="write_anno" value="$(arg write_anno)" />
+   <param name="write_directory" value="$(arg write_directory)" />
  </node>
-
-
 </launch>
