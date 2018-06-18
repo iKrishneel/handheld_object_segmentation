@@ -18,10 +18,13 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point32
 from geometry_msgs.msg import PolygonStamped as Rect
 
+from image_annotation_writer import ImageAnnotationWriter
+
 (CV_MAJOR, CV_MINOR, _) = cv.__version__.split(".")
 
-class HandHheldObjectTracking():
-    def __init__(self):
+class HandHheldObjectTracking(ImageAnnotationWriter):
+    def __init__(self, **kw):
+        
         self.__net = None
         self.__transformer = None
         self.__im_width = None
@@ -33,6 +36,15 @@ class HandHheldObjectTracking():
         self.__model_proto = rospy.get_param('~deployment_prototxt', None)
         self.__device_id = rospy.get_param('device_id', 0)
 
+        self.__write_data = rospy.get_param('~write_anno', False)
+        write_dir = rospy.get_param('~write_directory', None)
+
+        print (self.__weights)
+        print (self.__write_data)
+        print (write_dir)
+        if self.__write_data:
+            ImageAnnotationWriter.__init__(self, write_dir = write_dir, numeric_label = True)
+        
         self.__scales = np.array([1.250], dtype = np.float32)
 
         self.__rect = None
@@ -102,6 +114,12 @@ class HandHheldObjectTracking():
         caffe.set_device(self.__device_id)
         caffe.set_mode_gpu()
 
+        #! create copy of the inputs
+        input_rgb = im_rgb.copy()
+        input_depth = im_dep.copy()
+        input_depth /= input_depth.max()
+        input_depth *= 255
+        
         dist_mask_thresh = 4
         dist_mask_thresh *= 1000.0 if im_dep.max() > 1000.00 else 1.0
         
@@ -200,11 +218,22 @@ class HandHheldObjectTracking():
             im_mask2 = np.zeros(im_mask.shape, np.uint8)
             im_mask2[y:y+h, x:x+w] = im_mask[y:y+h, x:x+w]
             im_mask = self.depth_mask_filter(im_dep, im_mask2)
-            
+
+            ##! write data to memory
+            if self.__write_data:
+                self.write_data_to_memory(input_rgb, im_mask, input_depth, bbox)
+                
+            cv.namedWindow('image', cv.WINDOW_NORMAL)
+            im_mask = cv.cvtColor(im_mask, cv.COLOR_GRAY2BGR)
+            z = np.hstack((im_rgb, im_mask))
+            cv.imshow('image', z)
+                
             ##! reduce mask by scale
+            """
             prob_msg = self.__bridge.cv2_to_imgmsg(im_mask, "mono8")
             prob_msg.header = header
             self.__image_pub.publish(prob_msg)
+
             self.__image_pub2.publish(self.__bridge.cv2_to_imgmsg(im_rgb, "bgr8"))
 
             rect_msg = Rect()
@@ -218,6 +247,7 @@ class HandHheldObjectTracking():
             pt.y = bbox[3] + bbox[1]
             rect_msg.polygon.points.append(pt)
             self.__rect_pub.publish(rect_msg)
+            """
             
         if update_model:
             self.__prev_rgb = im_nrgb.copy()
@@ -231,7 +261,7 @@ class HandHheldObjectTracking():
                 
     def create_mask_rect(self, im_gray, rect):  #! rect used for cropping
         if len(im_gray.shape) is None:
-            print 'ERROR: Empty input mask'
+            print ('ERROR: Empty input mask')
             return
 
         if CV_MAJOR < str(3):
@@ -287,7 +317,7 @@ class HandHheldObjectTracking():
     def callback(self, image_msg, depth_msg):
         im_rgb= self.convert_image(image_msg)
         im_dep = self.convert_image(depth_msg, '32FC1')
-
+        
         if im_rgb is None or im_dep is None:
             rospy.logwarn('input msg is empty')
             return
@@ -343,9 +373,7 @@ class HandHheldObjectTracking():
         w = rect_msg.polygon.points[1].x  - x
         h = rect_msg.polygon.points[1].y - y
         self.__rect = np.array([x, y, w, h])
-
-        rospy.loginfo('Object Rect Received')
-        print self.__rect
+        rospy.loginfo('Object Rect Received: %s' % str(self.__rect))
         
 
     """
@@ -368,8 +396,7 @@ class HandHheldObjectTracking():
         try:
             cv_img = self.__bridge.imgmsg_to_cv2(image_msg, encoding)
         except Exception as e:
-            print (e)
-            return
+            rospy.logerr (e)
         
         return cv_img
 
